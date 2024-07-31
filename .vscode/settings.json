@@ -1,8 +1,9 @@
 {
-    "terminal.integrated.env.windows": {
-        "VIRTUAL_ENV": "C:\\Users\\Faculdade\\Desktop\\IC_main_Kauan-main\\ambientes_virtuais",
-        "PATH": "C:\\Users\\Faculdade\\Desktop\\IC_main_Kauan-main\\ambientes_virtuais\\Scripts;${env:PATH}"
+    "terminal.integrated.profiles.windows": {
+        "Custom CMD": {
+            "path": ["C:\\Windows\\System32\\cmd.exe"],
+            "args": ["/K", "C:\\Users\\Faculdade\\Desktop\\IC\\init_terminal.bat"]
+        }
     },
-    "terminal.integrated.cwd": "C:\\Users\\Faculdade\\Desktop\\IC_main_Kauan-main\\ambientes_virtuais\\mysite"
-
+    "terminal.integrated.defaultProfile.windows": "Custom CMD"
 }

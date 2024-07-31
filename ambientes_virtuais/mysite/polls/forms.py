@@ -24,6 +24,12 @@ class ClienteForm(forms.ModelForm):
                 raise forms.ValidationError("A senha deve ter exatamente 8 caracteres.")
         return senha
 
+    def clean_cnpj(self):
+        cnpj = self.cleaned_data.get('cnpj')
+        if cnpj and len(cnpj) != 14:
+            raise forms.ValidationError("O CNPJ deve ter exatamente 14 dígitos.")
+        return cnpj
+
     def clean(self):
         cleaned_data = super().clean()
         senha = cleaned_data.get('senha')
@@ -40,8 +46,10 @@ class ClienteForm(forms.ModelForm):
         
         if senha:
             cliente.senha = make_password(senha)
-
+        
         if commit:
+            if not cliente.data_cadastro:
+                cliente.data_cadastro = timezone.now()  # Adiciona a data de cadastro
             cliente.save()
             # Criar uma nova entrada de Login
             Login.objects.create(

@@ -16,14 +16,14 @@ class Cliente(models.Model):
     email = models.EmailField(max_length=50, unique=True, null=False, default='default@example.com')
     cnpj = models.CharField(max_length=14, unique=True, default='00000000000000')
     senha = models.CharField(max_length=128, null=True)  # Limitar senha para 8 caracteres
-    last_login = models.DateTimeField(blank=True, null=True)  # Adicionando o campo last_login
+    data_cadastro = models.DateTimeField(blank=True, null=True)  # Adicionando o campo last_login
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     
 
     def __str__(self):
-        return self.nome  # Ajustado para retornar o nome do cliente
-
+        return self.nome 
+    
     def has_perm(self, perm, obj=None):
         return True
 
@@ -40,3 +40,11 @@ class Login(models.Model):
         return f'{self.cliente.nome} - {self.descricao}'
     
     
+
+class MyModel(models.Model):
+    column1 = models.CharField(max_length=100)
+    column2 = models.IntegerField()
+    column3 = models.DateField()
+
+    def __str__(self):
+        return self.column1

@@ -3,12 +3,39 @@ from django.shortcuts import render, redirect
 from .forms import ClienteForm
 from django.db import IntegrityError
 from django.contrib import messages
-from django.contrib.auth import login as auth_login
 
-from .models import Cliente, Login
+from django.core.files.storage import FileSystemStorage
+
+from .models import Cliente, Login , MyModel
 from django.contrib.auth.hashers import check_password
 
 logger = logging.getLogger('django')
+
+
+import pandas as pd
+from .models import MyModel
+
+def upload_excel(request):
+    if request.method == 'POST' and request.FILES.get('excel_file'):
+        excel_file = request.FILES['excel_file']
+        fs = FileSystemStorage()
+        filename = fs.save(excel_file.name, excel_file)
+        uploaded_file_url = fs.url(filename)
+
+        # Ler o arquivo Excel
+        df = pd.read_excel(fs.path(filename))
+
+        # Salvar os dados no banco de dados
+        for index, row in df.iterrows():
+            MyModel.objects.create(
+                column1=row['Column1'],
+                column2=row['Column2'],
+                column3=row['Column3']
+            )
+
+        return render(request, 'upload.html', {'uploaded_file_url': uploaded_file_url})
+
+    return render(request, 'upload.html')
 
 def registro_view(request):
     if request.method == 'POST':
@@ -53,7 +80,6 @@ def login_view(request):
             messages.error(request, 'Email ou senha incorretos')
     
     return render(request, 'login.html')
-
 
 
 def index(request):
