@@ -13,4 +13,8 @@ urlpatterns = [
     path('password/', views.password, name='password'),
     path('index/', views.index, name='index'),
     path('tables/', views.tables, name='tables'),
+    path('upload/', views.upload_excel, name='upload_excel'),
+    path('logout/', views.logout_view, name='logout'),
+    
+
 ]

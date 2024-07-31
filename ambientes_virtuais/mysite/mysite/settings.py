@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 
 import os
 
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -79,6 +80,7 @@ MIDDLEWARE = [
 ]
 
 
+
 ROOT_URLCONF = 'mysite.urls'
 
 TEMPLATES = [
@@ -92,6 +94,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'polls.context_processors.cliente_context',
             ],
         },
     },
@@ -149,7 +152,21 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = 'static/'
+import os
+
+# settings.py
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+STATIC_URL = '/static/'
+
+# Adicione esta linha
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Outras configurações estáticas opcionais
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

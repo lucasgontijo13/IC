@@ -45,6 +45,8 @@ class MyModel(models.Model):
     column1 = models.CharField(max_length=100)
     column2 = models.IntegerField()
     column3 = models.DateField()
+    choice = models.CharField(max_length=20, choices=[('Sim', 'Sim'), ('Não', 'Não'), ('Não se aplica', 'Não se aplica')], blank=True)
+
 
     def __str__(self):
         return self.column1

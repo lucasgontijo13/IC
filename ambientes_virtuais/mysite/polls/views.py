@@ -1,48 +1,93 @@
-import logging
+import logging,os
 from django.shortcuts import render, redirect
 from .forms import ClienteForm
 from django.db import IntegrityError
 from django.contrib import messages
-
 from django.core.files.storage import FileSystemStorage
-
+import pandas as pd
 from .models import Cliente, Login , MyModel
 from django.contrib.auth.hashers import check_password
+from django.contrib.auth.models import User
+from django.contrib.auth import login
+from django.contrib.auth import logout as django_logout
+
 
 logger = logging.getLogger('django')
 
 
-import pandas as pd
-from .models import MyModel
+def logout_view(request):
+    cliente_id = request.session.get('cliente_id')
+    if cliente_id:
+        try:
+            cliente = Cliente.objects.get(id=cliente_id)
+            # Registrar o logout
+            Login.objects.create(
+                cliente=cliente,
+                descricao='Realizou Logout'
+            )
+        except Cliente.DoesNotExist:
+            logger.error(f'Cliente com ID {cliente_id} não encontrado.')
+    
+    django_logout(request)
+    return redirect('login')
+
+
 
 def upload_excel(request):
-    if request.method == 'POST' and request.FILES.get('excel_file'):
-        excel_file = request.FILES['excel_file']
+    if request.method == 'POST':
+        if 'file' not in request.FILES:
+            messages.error(request, 'Nenhum arquivo selecionado.')
+            return redirect('index')
+        
+        excel_file = request.FILES['file']
+        if not excel_file:
+            messages.error(request, 'Nenhum arquivo selecionado.')
+            return redirect('index')
+
         fs = FileSystemStorage()
         filename = fs.save(excel_file.name, excel_file)
         uploaded_file_url = fs.url(filename)
 
-        # Ler o arquivo Excel
-        df = pd.read_excel(fs.path(filename))
+        try:
+            # Ler o arquivo Excel
+            df = pd.read_excel(fs.path(filename))
 
-        # Salvar os dados no banco de dados
-        for index, row in df.iterrows():
-            MyModel.objects.create(
-                column1=row['Column1'],
-                column2=row['Column2'],
-                column3=row['Column3']
-            )
+            # Excluir dados antigos
+            MyModel.objects.all().delete()
 
-        return render(request, 'upload.html', {'uploaded_file_url': uploaded_file_url})
+            # Salvar os dados no banco de dados
+            for index, row in df.iterrows():
+                MyModel.objects.create(
+                    column1=row.get('Column1', ''),
+                    column2=row.get('Column2', 0),
+                    column3=row.get('Column3', pd.NaT)
+                )
 
-    return render(request, 'upload.html')
+            # Excluir o arquivo após o upload
+            os.remove(fs.path(filename))
+
+            messages.success(request, 'Arquivo enviado com sucesso!')
+        except Exception as e:
+            messages.error(request, f'Ocorreu um erro: {str(e)}')
+
+    return redirect('index')  # Redireciona para a página index
 
 def registro_view(request):
     if request.method == 'POST':
         form = ClienteForm(request.POST)
         if form.is_valid():
             try:
-                form.save()
+                user = User.objects.create_user(
+                    username=form.cleaned_data['email'],
+                    password=form.cleaned_data['senha']
+                )
+                cliente = form.save(commit=False)
+                cliente.user = user
+                cliente.save()
+                
+                login(request, user)
+                request.session['cliente_id'] = cliente.id
+                
                 logger.info('Cliente salvo com sucesso!')
                 return redirect('index')  # Redireciona para a página de sucesso após o registro
             except IntegrityError:
@@ -60,20 +105,17 @@ def login_view(request):
         email = request.POST.get('email')
         password = request.POST.get('password')
 
-        # Verificar se o cliente existe com o email fornecido
         try:
             cliente = Cliente.objects.get(email=email)
-            if check_password(password, cliente.senha):  # Verifica se a senha está correta
-                # Autenticação bem-sucedida
+            if check_password(password, cliente.senha):
                 request.session['cliente_id'] = cliente.id
                 
-                # Registrar o login
                 Login.objects.create(
                     cliente=cliente,
                     descricao='Realizou Login'
                 )
                 
-                return redirect('index')  # Redirecionar para a página inicial ou outra página após o login
+                return redirect('index')
             else:
                 messages.error(request, 'Email ou senha incorretos')
         except Cliente.DoesNotExist:
@@ -83,7 +125,9 @@ def login_view(request):
 
 
 def index(request):
-    return render(request, 'index.html')
+    # Recupera todos os registros de MyModel
+    data = MyModel.objects.all()
+    return render(request, 'index.html', {'data': data})
 
 def error_401(request):
     return render(request, '401.html')
