@@ -15,6 +15,8 @@ from django.contrib.auth import logout as django_logout
 logger = logging.getLogger('django')
 
 
+logger = logging.getLogger(__name__)
+
 def logout_view(request):
     cliente_id = request.session.get('cliente_id')
     if cliente_id:
@@ -100,6 +102,8 @@ def registro_view(request):
     
     return render(request, 'register.html', {'form': form})
 
+
+
 def login_view(request):
     if request.method == 'POST':
         email = request.POST.get('email')
@@ -155,6 +159,3 @@ def register(request):
 
 def tables(request):
     return render(request, 'tables.html')
-
-
-
