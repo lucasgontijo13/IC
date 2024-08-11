@@ -63,3 +63,4 @@ class ClienteForm(forms.ModelForm):
 class LoginForm(forms.Form):
     email = forms.EmailField(label='Email', max_length=255)
     password = forms.CharField(label='Senha', widget=forms.PasswordInput)
+

@@ -11305,3 +11305,19 @@ body {
   font-size: 16px;  /* Ajuste o tamanho da fonte */
   margin-bottom: 10px;
 }
+
+table td select {
+  min-width: 100%; /* Limita a largura máxima ao tamanho da célula */
+  width: auto;     /* Ajusta a largura conforme necessário */
+  box-sizing: border-box; /* Inclui o padding e a borda na largura total */
+}
+
+table td .custom-select-width {
+  max-width: 100%; /* Limita a largura máxima ao tamanho da célula */
+  width: auto;     /* Ajusta a largura conforme necessário */
+  box-sizing: border-box; /* Inclui o padding e a borda na largura total */
+}
+
+table th {
+  white-space: nowrap; /* Evita que o conteúdo da célula quebre em várias linhas */
+}

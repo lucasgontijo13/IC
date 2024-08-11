@@ -35,6 +35,7 @@ def logout_view(request):
 
 
 
+
 def upload_excel(request):
     if request.method == 'POST':
         if 'file' not in request.FILES:
@@ -45,34 +46,64 @@ def upload_excel(request):
         if not excel_file:
             messages.error(request, 'Nenhum arquivo selecionado.')
             return redirect('index')
-
+        
         fs = FileSystemStorage()
         filename = fs.save(excel_file.name, excel_file)
         uploaded_file_url = fs.url(filename)
-
+        
         try:
             # Ler o arquivo Excel
             df = pd.read_excel(fs.path(filename))
 
+            # Substituir NaN por strings vazias
+            df.fillna('', inplace=True)
+
             # Excluir dados antigos
             MyModel.objects.all().delete()
+
+            # Mapear colunas do DataFrame para campos do modelo
+            column_mapping = {
+                'CIS Control': 'cis_control',
+                'CIS Sub-Control': 'cis_sub_control',
+                'Tipo de ativo': 'tipo_de_ativo',
+                'Função de segurança': 'funcao_de_seguranca',
+                'Título': 'titulo',
+                'Descrição': 'descricao',
+                'NIST CSF': 'nist_csf',
+                'Nome da subcategoria': 'nome_da_subcategoria'
+            }
+
+            # Verificar se as colunas esperadas estão presentes no DataFrame
+            for col in column_mapping.keys():
+                if col not in df.columns:
+                    messages.error(request, f'Coluna {col} não encontrada no arquivo Excel.')
+                    return redirect('index')
 
             # Salvar os dados no banco de dados
             for index, row in df.iterrows():
                 MyModel.objects.create(
-                    column1=row.get('Column1', ''),
-                    column2=row.get('Column2', 0),
-                    column3=row.get('Column3', pd.NaT)
+                    cis_control=row['CIS Control'],
+                    cis_sub_control=row['CIS Sub-Control'],
+                    tipo_de_ativo=row['Tipo de ativo'],
+                    funcao_de_seguranca=row['Função de segurança'],
+                    titulo=row['Título'],
+                    descricao=row['Descrição'],
+                    nist_csf=row['NIST CSF'],
+                    nome_da_subcategoria=row['Nome da subcategoria']
                 )
-
+            
             # Excluir o arquivo após o upload
             os.remove(fs.path(filename))
-
             messages.success(request, 'Arquivo enviado com sucesso!')
+        
         except Exception as e:
             messages.error(request, f'Ocorreu um erro: {str(e)}')
+            return redirect('index')
+        
+        return redirect('index')
+    
+    return redirect('index')
 
-    return redirect('index')  # Redireciona para a página index
 
 def registro_view(request):
     if request.method == 'POST':
@@ -103,6 +134,19 @@ def registro_view(request):
     return render(request, 'register.html', {'form': form})
 
 
+def update_table(request):
+    if request.method == 'POST':
+        try:
+            for item in MyModel.objects.all():
+                action = request.POST.get(f'action_{item.id}')
+                item.action = action  # Adiciona o campo 'action' ao modelo MyModel
+                item.save()
+            messages.success(request, 'Tabela atualizada com sucesso!')
+        except Exception as e:
+            messages.error(request, f'Ocorreu um erro ao atualizar a tabela: {str(e)}')
+        return redirect('index')
+    else:
+        return redirect('index')
 
 def login_view(request):
     if request.method == 'POST':
@@ -159,3 +203,5 @@ def register(request):
 
 def tables(request):
     return render(request, 'tables.html')
+
+
