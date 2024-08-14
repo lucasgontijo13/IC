@@ -41,7 +41,7 @@ class Login(models.Model):
     
     
 
-class MyModel(models.Model):
+class framework(models.Model):
     cis_control = models.CharField(max_length=100)
     cis_sub_control = models.CharField(max_length=100)
     tipo_de_ativo = models.CharField(max_length=100)
@@ -50,6 +50,27 @@ class MyModel(models.Model):
     descricao = models.TextField()
     nist_csf = models.CharField(max_length=100)
     nome_da_subcategoria = models.CharField(max_length=255)
+    upload_date = models.DateField(default=timezone.now)
 
     def __str__(self):
         return self.titulo
+    
+def get_current_date():
+    return timezone.now().date()
+
+class ActionModel(models.Model):
+    nome = models.CharField(max_length=255, default='Default Name')
+    cis_control = models.CharField(max_length=100)
+    cis_sub_control = models.CharField(max_length=100)
+    tipo_de_ativo = models.CharField(max_length=100)
+    funcao_de_seguranca = models.CharField(max_length=100)
+    titulo = models.CharField(max_length=255)
+    descricao = models.TextField()
+    nist_csf = models.CharField(max_length=100)
+    nome_da_subcategoria = models.CharField(max_length=255)
+    acao = models.CharField(max_length=50, blank=True, null=True)  # Coluna de ação
+    upload_date = models.DateField(default=get_current_date)  # Apenas a data
+  
+    def __str__(self):
+        return self.titulo
+    

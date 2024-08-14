@@ -4,6 +4,9 @@ window.addEventListener('DOMContentLoaded', event => {
 
     const datatablesSimple = document.getElementById('datatablesSimple');
     if (datatablesSimple) {
-        new simpleDatatables.DataTable(datatablesSimple);
+        new simpleDatatables.DataTable(datatablesSimple, {
+            perPage: Number.MAX_VALUE, // Define o número máximo de linhas por página
+            perPageSelect: false // Remove o seletor de número de itens por página
+        });
     }
 });
