@@ -221,9 +221,9 @@
                                                 <td>{{ item.nome_da_subcategoria }}</td>
                                                 <td>
                                                     <select name="action_{{ item.id }}" class="form-control custom-select custom-select-width" aria-label="Ação">
-                                                        <option value="Sim">Sim</option>
-                                                        <option value="Não">Não</option>
-                                                        <option value="Não se aplica">Não se aplica</option>
+                                                        <option value="Sim" {% if item.acao == "Sim" %}selected{% endif %}>Sim</option>
+                                                        <option value="Não" {% if item.acao == "Não" %}selected{% endif %}>Não</option>
+                                                        <option value="Não se aplica" {% if item.acao == "Não se aplica" %}selected{% endif %}>Não se aplica</option>
                                                     </select>
                                                 </td>
                                             </tr>
@@ -232,9 +232,11 @@
                                                 <td colspan="{{ column_names|length|add:1 }}">Nenhum dado encontrado</td>
                                             </tr>
                                             {% endfor %}
-                                        </tbody>
+                                        </tbody>    
                                     </table>
-                                    <button type="submit" class="btn btn-primary mt-3">Enviar</button>
+                                    <button type="submit" name="save" value="final" class="btn btn-primary mt-3">Enviar</button>
+                                    <button type="submit" name="save" value="temporary" class="btn btn-secondary mt-3">Salvar Tabela</button>
+                                    <a href="{% url 'load_temporary_table' %}" class="btn btn-info mt-3">Puxar Tabela Salva</a>
                                 </form>
                             </div>                       
                         </div>

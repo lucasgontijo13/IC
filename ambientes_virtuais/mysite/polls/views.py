@@ -23,15 +23,34 @@ logger = logging.getLogger(__name__)
 
 
 
-
 def index(request):
     # Recupera todos os registros de framework
     data = framework.objects.all()
 
     # Define os nomes das colunas manualmente
-    column_names = ['CIS Control', 'CIS Sub-Control', 'Tipo de ativo', 'Função de segurança', 'Título', 'Descrição', 'NIST CSF', 'Nome da subcategoria']
+    column_names = [
+        'CIS Control', 'CIS Sub-Control', 'Tipo de ativo',
+        'Função de segurança', 'Título', 'Descrição',
+        'NIST CSF', 'Nome da subcategoria'
+    ]
 
-    return render(request, 'index.html', {'data': data, 'column_names': column_names})
+    # Cria uma lista de dados com 'acao' vazio
+    data_with_actions = []
+    for item in data:
+        data_with_actions.append({
+            'id': item.id,
+            'cis_control': item.cis_control,
+            'cis_sub_control': item.cis_sub_control,
+            'tipo_de_ativo': item.tipo_de_ativo,
+            'funcao_de_seguranca': item.funcao_de_seguranca,
+            'titulo': item.titulo,
+            'descricao': item.descricao,
+            'nist_csf': item.nist_csf,
+            'nome_da_subcategoria': item.nome_da_subcategoria,
+            'acao': '',  # Campo 'acao' vazio
+        })
+
+    return render(request, 'index.html', {'data': data_with_actions, 'column_names': column_names})
 
 
 def error_401(request):
@@ -209,59 +228,110 @@ def upload_excel(request):
     
     return redirect('index')
 
+from .models import TemporaryActionModel
+from django.conf import settings
+
 def update_table(request):
     if request.method == 'POST':
         try:
-            # Variável de data para teste
-            #test_date = timezone.datetime(2024, 8, 14).date()
-            #today = test_date
-
-            #Pegando a data do dia
             today = timezone.now().date()
-
-            # Obtém o e-mail do usuário logado
             user = request.user
+            nome_cliente = 'Desconhecido'
+
             if user.is_authenticated:
-                email = user.username  # Assumindo que o username é o e-mail
+                email = user.username
                 try:
-                    # Encontre o cliente usando o e-mail
                     cliente = Cliente.objects.get(email=email)
                     nome_cliente = cliente.nome
                 except Cliente.DoesNotExist:
-                    nome_cliente = 'Desconhecido'  # Nome padrão se o cliente não for encontrado
+                    pass
+
+            if request.POST.get('save') == 'temporary':
+                # Salva no TemporaryActionModel
+                TemporaryActionModel.objects.filter(nome=nome_cliente).delete()
+                for item in framework.objects.all():
+                    action = request.POST.get(f'action_{item.id}')
+                    if action:
+                        TemporaryActionModel.objects.create(
+                            nome=nome_cliente,
+                            cis_control=item.cis_control,
+                            cis_sub_control=item.cis_sub_control,
+                            tipo_de_ativo=item.tipo_de_ativo,
+                            funcao_de_seguranca=item.funcao_de_seguranca,
+                            titulo=item.titulo,
+                            descricao=item.descricao,
+                            nist_csf=item.nist_csf,
+                            nome_da_subcategoria=item.nome_da_subcategoria,
+                            acao=action,
+                            upload_date=today
+                        )
+                messages.success(request, 'Tabela salva temporariamente!')
             else:
-                nome_cliente = 'Desconhecido'
+                # Salva no ActionModel
+                ActionModel.objects.filter(upload_date=today, nome=nome_cliente).delete()
+                for item in framework.objects.all():
+                    action = request.POST.get(f'action_{item.id}')
+                    if action:
+                        ActionModel.objects.create(
+                            nome=nome_cliente,
+                            cis_control=item.cis_control,
+                            cis_sub_control=item.cis_sub_control,
+                            tipo_de_ativo=item.tipo_de_ativo,
+                            funcao_de_seguranca=item.funcao_de_seguranca,
+                            titulo=item.titulo,
+                            descricao=item.descricao,
+                            nist_csf=item.nist_csf,
+                            nome_da_subcategoria=item.nome_da_subcategoria,
+                            acao=action,
+                            upload_date=today
+                        )
+                
+                # Salvar arquivo Excel na pasta específica
+                file_path = os.path.join(settings.MEDIA_ROOT, f'{nome_cliente}_{today}.xlsx')
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = f"Planilha de {nome_cliente}"
 
-            # Verifica se já existe um registro para o cliente e a data atual
-            existing_records = ActionModel.objects.filter(upload_date=today, nome=nome_cliente)
+                headers = [
+                    "CIS Control", 
+                    "CIS Sub-Control", 
+                    "Tipo de ativo", 
+                    "Função de segurança", 
+                    "Título", 
+                    "Descrição",
+                    "NIST CSF",
+                    "Nome da subcategoria",
+                    "Ação"
+                ]
 
-            # Exclui todos os registros existentes para o cliente e o dia atual
-            if existing_records.exists():
-                existing_records.delete()
+                for col_num, header in enumerate(headers, 1):
+                    ws.cell(row=1, column=col_num, value=header)
 
-            # Cria novos registros com base nos itens do framework
-            for item in framework.objects.all():
-                action = request.POST.get(f'action_{item.id}')
-                if action:
-                    ActionModel.objects.create(
-                        nome=nome_cliente,  # Nome do cliente logado
-                        cis_control=item.cis_control,
-                        cis_sub_control=item.cis_sub_control,
-                        tipo_de_ativo=item.tipo_de_ativo,
-                        funcao_de_seguranca=item.funcao_de_seguranca,
-                        titulo=item.titulo,
-                        descricao=item.descricao,
-                        nist_csf=item.nist_csf,
-                        nome_da_subcategoria=item.nome_da_subcategoria,
-                        acao=action,
-                        upload_date=today  # Usa a data de teste
-                    )
-            messages.success(request, 'Tabela atualizada e salva com sucesso!')
+                registros = ActionModel.objects.filter(
+                    nome=nome_cliente,
+                    upload_date=today
+                )
+
+                for row_num, registro in enumerate(registros, 2):
+                    ws.cell(row=row_num, column=1, value=registro.cis_control)
+                    ws.cell(row=row_num, column=2, value=registro.cis_sub_control)
+                    ws.cell(row=row_num, column=3, value=registro.tipo_de_ativo)
+                    ws.cell(row=row_num, column=4, value=registro.funcao_de_seguranca)
+                    ws.cell(row=row_num, column=5, value=registro.titulo)
+                    ws.cell(row=row_num, column=6, value=registro.descricao)
+                    ws.cell(row=row_num, column=7, value=registro.nist_csf)
+                    ws.cell(row=row_num, column=8, value=registro.nome_da_subcategoria)
+                    ws.cell(row=row_num, column=9, value=registro.acao)
+
+                wb.save(file_path)
+                messages.success(request, 'Tabela atualizada e salva com sucesso!')
+                
         except Exception as e:
             messages.error(request, f'Ocorreu um erro ao atualizar a tabela: {str(e)}')
         return redirect('index')
     else:
         return redirect('index')
+
 
 def download_actionModel(request):
     # Recebe parâmetros da requisição
@@ -334,3 +404,60 @@ def download_actionModel(request):
     # Salva a planilha no response
     wb.save(response)
     return response
+
+
+def load_temporary_table(request):
+    # Verifica se o usuário está autenticado
+    if request.user.is_authenticated:
+        try:
+            # Obtém o email do usuário logado
+            email = request.user.username
+            # Encontra o cliente com base no email
+            cliente = Cliente.objects.get(email=email)
+            # Recupera os registros temporários para este cliente
+            temp_records = TemporaryActionModel.objects.filter(nome=cliente.nome)
+
+            # Verifica se existem registros temporários
+            if not temp_records.exists():
+                messages.info(request, 'Nenhum registro temporário encontrado.')
+                return redirect('index')
+
+            # Carrega os dados do framework
+            data = framework.objects.all()
+
+            # Define os nomes das colunas manualmente
+            column_names = [
+                'CIS Control', 'CIS Sub-Control', 'Tipo de ativo',
+                'Função de segurança', 'Título', 'Descrição',
+                'NIST CSF', 'Nome da subcategoria'
+            ]
+
+            # Mapeia as ações temporárias por título
+            temp_actions = {record.titulo: record.acao for record in temp_records}
+
+            # Cria uma nova lista de dados com o campo 'acao'
+            data_with_actions = []
+            for item in data:
+                data_with_actions.append({
+                    'id': item.id,
+                    'cis_control': item.cis_control,
+                    'cis_sub_control': item.cis_sub_control,
+                    'tipo_de_ativo': item.tipo_de_ativo,
+                    'funcao_de_seguranca': item.funcao_de_seguranca,
+                    'titulo': item.titulo,
+                    'descricao': item.descricao,
+                    'nist_csf': item.nist_csf,
+                    'nome_da_subcategoria': item.nome_da_subcategoria,
+                    'acao': temp_actions.get(item.titulo, ''),  # Adiciona a ação correspondente
+                })
+
+            return render(request, 'index.html', {
+                'data': data_with_actions,  # Passa os dados com ações
+                'column_names': column_names,
+            })
+        except Cliente.DoesNotExist:
+            messages.error(request, 'Cliente não encontrado.')
+            return redirect('login')
+    else:
+        return redirect('login')
+    

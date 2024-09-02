@@ -74,3 +74,18 @@ class ActionModel(models.Model):
     def __str__(self):
         return self.titulo
     
+class TemporaryActionModel(models.Model):
+    nome = models.CharField(max_length=255, default='Default Name')
+    cis_control = models.CharField(max_length=100)
+    cis_sub_control = models.CharField(max_length=100)
+    tipo_de_ativo = models.CharField(max_length=100)
+    funcao_de_seguranca = models.CharField(max_length=100)
+    titulo = models.CharField(max_length=255)
+    descricao = models.TextField()
+    nist_csf = models.CharField(max_length=100)
+    nome_da_subcategoria = models.CharField(max_length=255)
+    acao = models.CharField(max_length=50, blank=True, null=True)
+    upload_date = models.DateField(default=get_current_date)
+
+    def __str__(self):
+        return self.titulo
