@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 from .views import download_actionModel
-
+from django.urls import path, include
 urlpatterns = [
     path('register/', views.registro_view, name='register'),  # Use 'registro_view' para a página de registro
     path('401/', views.error_401, name='error_401'),
@@ -18,6 +18,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('update_table/', views.update_table, name='update_table'),
     path('download/', download_actionModel, name='download_actionModel'),
-  
     path('load_temporary_table/', views.load_temporary_table, name='load_temporary_table'),
+
+   path('accounts/', include('allauth.urls')),
 ]

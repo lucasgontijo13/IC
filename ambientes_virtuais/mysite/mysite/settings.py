@@ -56,6 +56,11 @@ LOGGING = {
 # Application definition
 
 INSTALLED_APPS = [
+    'django.contrib.sites',  # Necessário para o allauth
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -65,7 +70,6 @@ INSTALLED_APPS = [
     'polls.apps.PollsConfig',
 ]
 
-
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -74,8 +78,35 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    'allauth.account.middleware.AccountMiddleware', 
 ]
 
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
+
+# Configurações para o Django Allauth
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': '6087943782-2gqa1btjbc5fhm0m8f6rsmul4cn9l5ae.apps.googleusercontent.com',
+            'secret': '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',
+            'key': ''
+        }
+    }
+}
+
+LOGIN_REDIRECT_URL = '/index'
 
 
 ROOT_URLCONF = 'mysite.urls'
