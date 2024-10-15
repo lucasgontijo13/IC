@@ -50,16 +50,39 @@ $(document).ready( function () {
     $('#datatablesSimple').DataTable();
 });
 
-document.getElementById('upload-form').addEventListener('submit', function(event) {
-    var fileInput = document.getElementById('file-upload');
-    if (!fileInput.files.length) {
-        event.preventDefault(); // Impede o envio do formulário
-        alert('Selecione um arquivo para enviar');
+
+
+function openEditModal(id, acao) {
+    document.getElementById('editId').value = id;
+    document.getElementById('editAcao').value = acao;
+    var editModal = new bootstrap.Modal(document.getElementById('editModal'));
+    editModal.show();
+}
+
+function saveEdit() {
+    const id = document.getElementById('editId').value;
+    const newAcao = document.getElementById('editAcao').value;
+
+    // Atualiza o valor do select correspondente na tabela
+    const select = document.querySelector(`select[name="action_${id}"]`);
+    if (select) {
+        select.value = newAcao;
     }
-});
 
+    // Adiciona o campo hidden de ID para garantir que o item_id seja enviado
+    const editIdInput = document.createElement('input');
+    editIdInput.type = 'hidden';
+    editIdInput.name = 'editId';  // Nome correto para pegar no POST
+    editIdInput.value = id;
+    document.getElementById('mainForm').appendChild(editIdInput);
 
+    // Configura o campo 'save' para 'temporary' para salvar no TemporaryActionModel
+    const saveButton = document.createElement('input');
+    saveButton.type = 'hidden';
+    saveButton.name = 'save';
+    saveButton.value = 'temporary';
+    document.getElementById('mainForm').appendChild(saveButton);
 
-
-
-
+    // Submete o formulário para salvar as alterações
+    document.getElementById('mainForm').submit();
+}

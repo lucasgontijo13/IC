@@ -197,15 +197,15 @@
                                 DataTable Example
                             </div>
                             <div class="card-body">
-                                <form method="post" action="{% url 'update_table' %}">
+                                <form method="post" action="{% url 'update_table' %}" id="mainForm">
                                     {% csrf_token %}
-                                    <table id="datatablesSimple">
+                                    <table id="datatablesSimple" class="table table-striped table-bordered">
                                         <thead>
                                             <tr>
                                                 {% for column_name in column_names %}
                                                 <th>{{ column_name }}</th>
                                                 {% endfor %}
-                                                <th>Ação</th>
+                                                <th id="acao">Ação</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -220,11 +220,17 @@
                                                 <td>{{ item.nist_csf }}</td>
                                                 <td>{{ item.nome_da_subcategoria }}</td>
                                                 <td>
-                                                    <select name="action_{{ item.id }}" class="form-control custom-select custom-select-width" aria-label="Ação">
-                                                        <option value="Sim" {% if item.acao == "Sim" %}selected{% endif %}>Sim</option>
-                                                        <option value="Não" {% if item.acao == "Não" %}selected{% endif %}>Não</option>
-                                                        <option value="Não se aplica" {% if item.acao == "Não se aplica" %}selected{% endif %}>Não se aplica</option>
-                                                    </select>
+                                                    <div class="d-grid">
+                                                        <select name="action_{{ item.id }}" class="form-control custom-select" aria-label="Ação">
+                                                            <option value=""></option>
+                                                            <option value="Sim" {% if item.acao == "Sim" %}selected{% endif %}>Sim</option>
+                                                            <option value="Não" {% if item.acao == "Não" %}selected{% endif %}>Não</option>
+                                                            <option value="Não se aplica" {% if item.acao == "Não se aplica" %}selected{% endif %}>Não se aplica</option>
+                                                        </select>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="openEditModal({{ item.id }}, '{{ item.acao }}')">
+                                                            <i class="fas fa-edit"></i> Editar
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                             {% empty %}
@@ -232,14 +238,42 @@
                                                 <td colspan="{{ column_names|length|add:1 }}">Nenhum dado encontrado</td>
                                             </tr>
                                             {% endfor %}
-                                        </tbody>    
+                                        </tbody>
                                     </table>
                                     <button type="submit" name="save" value="final" class="btn btn-primary mt-3">Enviar</button>
-                                    <button type="submit" name="save" value="temporary" class="btn btn-secondary mt-3">Salvar Tabela</button>
+                                    <button type="submit" name="save" value="save_all" class="btn btn-secondary mt-3">Salvar Tabela</button>
                                     <a href="{% url 'load_temporary_table' %}" class="btn btn-info mt-3">Puxar Tabela Salva</a>
                                 </form>
-                            </div>                       
+                            </div>
                         </div>
+                        
+                        <!-- Modal para edição -->
+                        <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="editModalLabel">Editar Ação</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <form id="editForm">
+                                            <input type="hidden" id="editId">
+                                            <div class="mb-3">
+                                                <label for="editAcao" class="form-label">Ação</label>
+                                                <select class="form-control" id="editAcao">
+                                                    <option value="Sim">Sim</option>
+                                                    <option value="Não">Não</option>
+                                                    <option value="Não se aplica">Não se aplica</option>
+                                                </select>
+                                            </div>
+                                            <button type="button" class="btn btn-primary" onclick="saveEdit()">Salvar</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        
                     </div>
                 </main>
                 <footer class="py-4 bg-light mt-auto">

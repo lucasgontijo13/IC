@@ -18,6 +18,6 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('update_table/', views.update_table, name='update_table'),
     path('download/', download_actionModel, name='download_actionModel'),
-
+  
     path('load_temporary_table/', views.load_temporary_table, name='load_temporary_table'),
 ]

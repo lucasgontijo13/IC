@@ -16,6 +16,10 @@ import openpyxl
 from django.http import HttpResponse
 from datetime import datetime
 
+from openpyxl import Workbook
+from django.conf import settings
+from .models import TemporaryActionModel
+
 logger = logging.getLogger('django')
 
 
@@ -29,7 +33,7 @@ def index(request):
 
     # Define os nomes das colunas manualmente
     column_names = [
-        'CIS Control', 'CIS Sub-Control', 'Tipo de ativo',
+        'Control', 'Sub-Control', 'Ativo',
         'Função de segurança', 'Título', 'Descrição',
         'NIST CSF', 'Nome da subcategoria'
     ]
@@ -228,8 +232,7 @@ def upload_excel(request):
     
     return redirect('index')
 
-from .models import TemporaryActionModel
-from django.conf import settings
+
 
 def update_table(request):
     if request.method == 'POST':
@@ -246,9 +249,66 @@ def update_table(request):
                 except Cliente.DoesNotExist:
                     pass
 
+            # Verificar se uma ação foi enviada para salvar temporariamente
             if request.POST.get('save') == 'temporary':
-                # Salva no TemporaryActionModel
+                item_id = request.POST.get('editId')  # Pega o 'editId'
+                
+                # Verificar se a ação para o item foi passada corretamente
+                new_action = request.POST.get(f'action_{item_id}')
+                
+                if item_id and new_action:
+                    # Verificar se o item existe no framework
+                    try:
+                        framework_item = framework.objects.get(id=item_id)
+                    except framework.DoesNotExist:
+                        messages.error(request, 'Item do framework não encontrado.')
+                        return redirect('index')
+
+                    # Atualizar ou criar a ação temporária
+                    TemporaryActionModel.objects.update_or_create(
+                        nome=nome_cliente,
+                        titulo=framework_item.titulo,
+                        defaults={
+                            'acao': new_action,
+                            'cis_control': framework_item.cis_control,
+                            'cis_sub_control': framework_item.cis_sub_control,
+                            'tipo_de_ativo': framework_item.tipo_de_ativo,
+                            'funcao_de_seguranca': framework_item.funcao_de_seguranca,
+                            'descricao': framework_item.descricao,
+                            'nist_csf': framework_item.nist_csf,
+                            'nome_da_subcategoria': framework_item.nome_da_subcategoria,
+                            'upload_date': today
+                        }
+                    )
+                    messages.success(request, 'Ação da linha salva temporariamente.')
+                else:
+                    messages.error(request, 'Nenhuma linha foi selecionada para atualizar.')
+
+            elif request.POST.get('save') == 'final':
+                # Enviar para ActionModel
+                for item in framework.objects.all():
+                    action = request.POST.get(f'action_{item.id}')
+                    if action:  # Apenas envia se houver uma ação
+                        # Verifica se já existe uma entrada para o usuário e data atual
+                        ActionModel.objects.update_or_create(
+                            upload_date=today, nome=nome_cliente, titulo=item.titulo,
+                            defaults={
+                                'cis_control': item.cis_control,
+                                'cis_sub_control': item.cis_sub_control,
+                                'tipo_de_ativo': item.tipo_de_ativo,
+                                'funcao_de_seguranca': item.funcao_de_seguranca,
+                                'descricao': item.descricao,
+                                'nist_csf': item.nist_csf,
+                                'nome_da_subcategoria': item.nome_da_subcategoria,
+                                'acao': action
+                            }
+                        )
+                messages.success(request, 'Tabela enviada com sucesso!')
+
+            else:
+                # Salvar toda a tabela no TemporaryActionModel
                 TemporaryActionModel.objects.filter(nome=nome_cliente).delete()
+                
                 for item in framework.objects.all():
                     action = request.POST.get(f'action_{item.id}')
                     if action:
@@ -265,72 +325,23 @@ def update_table(request):
                             acao=action,
                             upload_date=today
                         )
-                messages.success(request, 'Tabela salva temporariamente!')
-            else:
-                # Salva no ActionModel
-                ActionModel.objects.filter(upload_date=today, nome=nome_cliente).delete()
-                for item in framework.objects.all():
-                    action = request.POST.get(f'action_{item.id}')
-                    if action:
-                        ActionModel.objects.create(
-                            nome=nome_cliente,
-                            cis_control=item.cis_control,
-                            cis_sub_control=item.cis_sub_control,
-                            tipo_de_ativo=item.tipo_de_ativo,
-                            funcao_de_seguranca=item.funcao_de_seguranca,
-                            titulo=item.titulo,
-                            descricao=item.descricao,
-                            nist_csf=item.nist_csf,
-                            nome_da_subcategoria=item.nome_da_subcategoria,
-                            acao=action,
-                            upload_date=today
-                        )
-                
-                # Salvar arquivo Excel na pasta específica
-                file_path = os.path.join(settings.MEDIA_ROOT, f'{nome_cliente}_{today}.xlsx')
-                wb = openpyxl.Workbook()
-                ws = wb.active
-                ws.title = f"Planilha de {nome_cliente}"
 
-                headers = [
-                    "CIS Control", 
-                    "CIS Sub-Control", 
-                    "Tipo de ativo", 
-                    "Função de segurança", 
-                    "Título", 
-                    "Descrição",
-                    "NIST CSF",
-                    "Nome da subcategoria",
-                    "Ação"
-                ]
+                messages.success(request, 'Tabela salva temporariamente com sucesso!')
 
-                for col_num, header in enumerate(headers, 1):
-                    ws.cell(row=1, column=col_num, value=header)
-
-                registros = ActionModel.objects.filter(
-                    nome=nome_cliente,
-                    upload_date=today
-                )
-
-                for row_num, registro in enumerate(registros, 2):
-                    ws.cell(row=row_num, column=1, value=registro.cis_control)
-                    ws.cell(row=row_num, column=2, value=registro.cis_sub_control)
-                    ws.cell(row=row_num, column=3, value=registro.tipo_de_ativo)
-                    ws.cell(row=row_num, column=4, value=registro.funcao_de_seguranca)
-                    ws.cell(row=row_num, column=5, value=registro.titulo)
-                    ws.cell(row=row_num, column=6, value=registro.descricao)
-                    ws.cell(row=row_num, column=7, value=registro.nist_csf)
-                    ws.cell(row=row_num, column=8, value=registro.nome_da_subcategoria)
-                    ws.cell(row=row_num, column=9, value=registro.acao)
-
-                wb.save(file_path)
-                messages.success(request, 'Tabela atualizada e salva com sucesso!')
-                
         except Exception as e:
             messages.error(request, f'Ocorreu um erro ao atualizar a tabela: {str(e)}')
+
         return redirect('index')
     else:
         return redirect('index')
+
+
+
+
+
+
+
+
 
 
 def download_actionModel(request):
@@ -461,3 +472,5 @@ def load_temporary_table(request):
     else:
         return redirect('login')
     
+
+
