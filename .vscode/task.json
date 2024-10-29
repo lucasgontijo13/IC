@@ -4,7 +4,7 @@
         {
             "label": "Activate Virtual Environment",
             "type": "shell",
-            "command": "C:/Users/Faculdade/Desktop/IC/ambientes_virtuais/ambientes_virtuais/virtual_01/Scripts/activate",
+            "command": "C:/Users/lucas/Desktop/IC/ambientes_virtuais/ambientes_virtuais/virtual_01/Scripts/activate",
             "problemMatcher": [],
             "group": {
                 "kind": "build",

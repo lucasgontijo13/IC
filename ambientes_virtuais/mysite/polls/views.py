@@ -15,7 +15,7 @@ from django.contrib.auth import authenticate, login as auth_login
 import openpyxl
 from django.http import HttpResponse
 from datetime import datetime
-
+from django.contrib.auth import login, get_user_model
 from openpyxl import Workbook
 from django.conf import settings
 from .models import TemporaryActionModel
@@ -26,6 +26,11 @@ logger = logging.getLogger('django')
 logger = logging.getLogger(__name__)
 
 
+import plotly.graph_objs as go
+from django.shortcuts import render
+from django.http import JsonResponse
+
+import plotly.graph_objects as go
 
 def index(request):
     # Recupera todos os registros de framework
@@ -37,6 +42,159 @@ def index(request):
         'Função de segurança', 'Título', 'Descrição',
         'NIST CSF', 'Nome da subcategoria'
     ]
+
+    # Inicializa as variáveis para os gráficos
+    grafico_pizza = None
+    grafico_velocimetro = None
+    grafico_linha = None  # Adicione esta linha
+
+    # Verifica se o usuário está autenticado
+    if request.user.is_authenticated:
+        # Obtém o email do usuário logado
+        email = request.user.username
+        try:
+            # Encontra o cliente com base no email
+            cliente = Cliente.objects.get(email=email)
+
+            # Consulta datas únicas de uploads na ActionModel associadas ao cliente logado
+            datas_uploads = (
+                ActionModel.objects
+                .filter(nome=cliente.nome)
+                .values_list('upload_date', flat=True)
+                .distinct()
+                .order_by('upload_date')
+            )
+            # Formata as datas para YYYY-MM-DD
+            datas_uploads = [date.strftime('%Y-%m-%d') for date in datas_uploads]                
+            
+            # Processa o POST para gerar gráficos
+            if request.method == 'POST':
+                selected_date = request.POST.get('selected_date')
+                actions = ActionModel.objects.filter(upload_date=selected_date, nome=cliente.nome)
+
+                # Contando as ações, desconsiderando "Não se Aplica"
+                sim_count = actions.filter(acao='sim').count()
+                nao_count = actions.filter(acao='nao').count()
+
+                # Criando o gráfico de pizza
+                labels = ['Sim', 'Não']
+                values = [sim_count, nao_count]
+
+                # Criando o gráfico de donut
+                fig_pizza = go.Figure(data=[go.Pie(
+                    labels=labels,
+                    values=values,
+                    hole=0.4,  # Adiciona um buraco no centro para um gráfico de donut
+                    textinfo='label+percent',  # Exibe rótulos e porcentagens
+                    textfont=dict(size=14),  # Tamanho da fonte dos textos
+                    insidetextorientation='radial',  # Orientação do texto dentro do gráfico
+                    marker=dict(
+                        colors=['#636EFA', '#EF553B'],  # Cores personalizadas
+                        line=dict(color='#000000', width=2)  # Borda das fatias
+                    ),
+                    hoverinfo='label+value+percent'  # Informações ao passar o mouse
+                )])
+
+                # Estilo do layout do gráfico de pizza
+                fig_pizza.update_layout(
+                    title_text='Distribuição das Ações',  # Título do gráfico
+                    titlefont_size=20,  # Tamanho da fonte do título
+                    showlegend=True,  # Exibe a legenda
+                    legend=dict(
+                        orientation="h",  # Orientação da legenda
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    )
+                )
+
+                # Criando o gráfico de velocímetro
+                total_actions = sim_count + nao_count
+                if total_actions > 0:
+                    percentage = (sim_count / total_actions) * 100
+                else:
+                    percentage = 0  # Evitar divisão por zero
+
+                
+                # Criando o gráfico de velocímetro com tamanho reduzido
+                fig_velocimetro = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=percentage,
+                    title={'text': "Velocímetro", 'font': {'size': 16}},  # Título do gráfico com fonte menor
+                    number={'font': {'size': 28, 'color': 'blue'}},  # Número central com fonte menor
+                    gauge={
+                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "black"},
+                        'bar': {'color': "darkblue", 'thickness': 0.2},  # Barra mais fina
+                        'bgcolor': "white",
+                        'borderwidth': 1,
+                        'bordercolor': "gray",
+                        'steps': [
+                            {'range': [0, 50], 'color': "LightBlue"},
+                            {'range': [50, 100], 'color': "RoyalBlue"}
+                        ],
+                        'threshold': {
+                            'line': {'color': "red", 'width': 4},
+                            'thickness': 0.75,
+                            'value': 90  # Valor do limite
+                        }
+                    }
+                ))
+
+                # Estilo do layout do gráfico de velocímetro com margens reduzidas
+                fig_velocimetro.update_layout(
+                    title_text="Percentual de Ações 'Sim'",
+                    titlefont_size=16,  # Tamanho da fonte do título reduzido
+                    margin=dict(l=35, r=35, t=30, b=10),  # Margens menores
+                    font=dict(color='black', size=12)  # Fonte geral menor
+                )
+
+                # Criando o gráfico de linha
+                # Recupera todos os uploads associados ao cliente
+                action_data = ActionModel.objects.filter(nome=cliente.nome).order_by('upload_date')
+
+                # Prepare os dados para o gráfico de linha
+                dates = [action.upload_date.strftime('%Y-%m-%d') for action in action_data]
+                sim_counts = [action_data.filter(upload_date=action.upload_date, acao='sim').count() for action in action_data]
+                nao_counts = [action_data.filter(upload_date=action.upload_date, acao='nao').count() for action in action_data]
+
+                # Criando o gráfico de linha
+                fig_linha = go.Figure()
+                fig_linha.add_trace(go.Scatter(
+                    x=dates,
+                    y=sim_counts,
+                    mode='lines+markers',
+                    name='Ações Sim',
+                    line=dict(color='blue', width=2),
+                    marker=dict(size=8)
+                ))
+                fig_linha.add_trace(go.Scatter(
+                    x=dates,
+                    y=nao_counts,
+                    mode='lines+markers',
+                    name='Ações Não',
+                    line=dict(color='red', width=2),
+                    marker=dict(size=8)
+                ))
+
+                # Estilo do layout do gráfico de linha
+                fig_linha.update_layout(
+                    title='Contagem de Ações ao Longo do Tempo',
+                    xaxis_title='Datas',
+                    yaxis_title='Contagem',
+                    titlefont_size=20,
+                    margin=dict(l=40, r=40, t=40, b=40),
+                    font=dict(size=14),
+                    legend=dict(x=0, y=1)
+                )
+
+                # Converte gráficos para HTML
+                grafico_pizza = fig_pizza.to_html(full_html=False)
+                grafico_velocimetro = fig_velocimetro.to_html(full_html=False)
+                grafico_linha = fig_linha.to_html(full_html=False)  # Converte gráfico de linha para HTML
+
+        except Cliente.DoesNotExist:
+            datas_uploads = []
 
     # Cria uma lista de dados com 'acao' vazio
     data_with_actions = []
@@ -54,7 +212,15 @@ def index(request):
             'acao': '',  # Campo 'acao' vazio
         })
 
-    return render(request, 'index.html', {'data': data_with_actions, 'column_names': column_names})
+    return render(request, 'index.html', {
+        'data': data_with_actions,
+        'column_names': column_names,
+        'datas_uploads': datas_uploads,  # Passa as datas para o template
+        'grafico_pizza': grafico_pizza,  # Passa o gráfico de pizza para o template
+        'grafico_velocimetro': grafico_velocimetro,  # Passa o gráfico de velocímetro para o template
+        'grafico_linha': grafico_linha,  # Passa o gráfico de linha para o template
+    })
+
 
 
 def error_401(request):
@@ -101,32 +267,38 @@ def logout_view(request):
     django_logout(request)
     return redirect('login')
 
+
 def registro_view(request):
     if request.method == 'POST':
         form = ClienteForm(request.POST)
         if form.is_valid():
             try:
+                User = get_user_model()
                 user = User.objects.create_user(
                     username=form.cleaned_data['email'],
                     password=form.cleaned_data['senha']
                 )
+                
                 cliente = form.save(commit=False)
                 cliente.user = user
                 cliente.save()
-                
-                login(request, user)
+
+                # Definir o backend explicitamente e fazer login
+                backend = 'django.contrib.auth.backends.ModelBackend'
+                user.backend = backend
+                login(request, user, backend=backend)
+
                 request.session['cliente_id'] = cliente.id
-                
                 logger.info('Cliente salvo com sucesso!')
                 return redirect('index')  # Redireciona para a página de sucesso após o registro
             except IntegrityError:
-                # As mensagens de erro já foram adicionadas ao formulário no método save()
-                pass
+                form.add_error(None, "Erro de integridade: possivelmente o e-mail já está em uso.")
+                logger.error("Erro de integridade ao salvar cliente.")
         else:
             logger.error('Formulário inválido: %s', form.errors)
     else:
         form = ClienteForm()
-    
+
     return render(request, 'register.html', {'form': form})
 
 def login_view(request):
@@ -160,8 +332,6 @@ def login_view(request):
             messages.error(request, 'Email ou senha incorretos')
     
     return render(request, 'login.html')
-
-
 
 
 def upload_excel(request):
@@ -336,14 +506,6 @@ def update_table(request):
         return redirect('index')
 
 
-
-
-
-
-
-
-
-
 def download_actionModel(request):
     # Recebe parâmetros da requisição
     user_name = request.GET.get('user_name')
@@ -472,5 +634,7 @@ def load_temporary_table(request):
     else:
         return redirect('login')
     
+
+
 
 

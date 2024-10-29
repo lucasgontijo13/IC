@@ -87,3 +87,26 @@ function saveEdit() {
     document.getElementById('mainForm').submit();
 }
 
+
+
+
+$(document).ready(function() {
+    $('#carregarButton').click(function() {
+        var selectedDate = $('#dateSelect').val();
+        if (selectedDate) {
+            $.ajax({
+                type: "POST",
+                url: "{% url 'index' %}",  // Certifique-se de que a URL está correta
+                data: {
+                    'selected_date': selectedDate,
+                    'csrfmiddlewaretoken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    $('#grafico_pizza').html(response.grafico_pizza);
+                }
+            });
+        } else {
+            alert("Por favor, selecione uma data.");
+        }
+    });
+});

@@ -82,7 +82,7 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware', 
 ]
 
-SITE_ID = 1
+SITE_ID = 5
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',

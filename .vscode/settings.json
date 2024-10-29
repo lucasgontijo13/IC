@@ -2,7 +2,7 @@
     "terminal.integrated.profiles.windows": {
         "Custom CMD": {
             "path": ["C:\\Windows\\System32\\cmd.exe"],
-            "args": ["/K", "C:\\Users\\Faculdade\\Desktop\\IC\\init_terminal.bat"]
+            "args": ["/K", "C:\\Users\\lucas\\Desktop\\IC\\init_terminal.bat"]
         }
     },
     "terminal.integrated.defaultProfile.windows": "Custom CMD"
