@@ -17,210 +17,117 @@ from django.http import HttpResponse
 from datetime import datetime
 from django.contrib.auth import login, get_user_model
 from openpyxl import Workbook
-from django.conf import settings
 from .models import TemporaryActionModel
+import plotly.graph_objs as go
+import plotly.graph_objects as go
 
 logger = logging.getLogger('django')
 
 
 logger = logging.getLogger(__name__)
 
-
-import plotly.graph_objs as go
-from django.shortcuts import render
-from django.http import JsonResponse
-
-import plotly.graph_objects as go
-
 def index(request):
-    # Recupera todos os registros de framework
-    data = framework.objects.all()
-
-    # Define os nomes das colunas manualmente
     column_names = [
-        'Control', 'Sub-Control', 'Ativo',
-        'Função de segurança', 'Título', 'Descrição',
-        'NIST CSF', 'Nome da subcategoria'
+        'Control', 'Sub-Control', 'Ativo', 'Função de segurança', 'Título', 'Descrição',
+        'NIST CSF', 'IG', 'Nome da subcategoria'
     ]
 
-    # Inicializa as variáveis para os gráficos
-    grafico_pizza = None
-    grafico_velocimetro = None
-    grafico_linha = None  # Adicione esta linha
+    grafico_pizza = grafico_velocimetro = grafico_linha = None
+    email = request.user.username
+    ig_percentages = {}
 
-    # Verifica se o usuário está autenticado
-    if request.user.is_authenticated:
-        # Obtém o email do usuário logado
-        email = request.user.username
-        try:
-            # Encontra o cliente com base no email
-            cliente = Cliente.objects.get(email=email)
+    try:
+        cliente = Cliente.objects.get(email=email)
+        datas_uploads = get_unique_upload_dates(cliente)
 
-            # Consulta datas únicas de uploads na ActionModel associadas ao cliente logado
-            datas_uploads = (
-                ActionModel.objects
-                .filter(nome=cliente.nome)
-                .values_list('upload_date', flat=True)
-                .distinct()
-                .order_by('upload_date')
-            )
-            # Formata as datas para YYYY-MM-DD
-            datas_uploads = [date.strftime('%Y-%m-%d') for date in datas_uploads]                
-            
-            # Processa o POST para gerar gráficos
-            if request.method == 'POST':
-                selected_date = request.POST.get('selected_date')
-                actions = ActionModel.objects.filter(upload_date=selected_date, nome=cliente.nome)
+        if request.method == 'POST':
+            selected_date = request.POST.get('selected_date')
+            actions = ActionModel.objects.filter(upload_date=selected_date, nome=cliente.nome)
 
-                # Contando as ações, desconsiderando "Não se Aplica"
-                sim_count = actions.filter(acao='sim').count()
-                nao_count = actions.filter(acao='nao').count()
+            # Contagem para o gráfico de velocímetro
+            sim_count = actions.filter(acao='sim').count()
+            nao_count = actions.filter(acao='nao').count()
+            grafico_velocimetro = create_speedometer_chart(sim_count, nao_count)
 
-                # Criando o gráfico de pizza
-                labels = ['Sim', 'Não']
-                values = [sim_count, nao_count]
+            # Calcula as porcentagens de IG chamando a nova função
+            ig_percentages = calculate_ig_percentages(actions)
 
-                # Criando o gráfico de donut
-                fig_pizza = go.Figure(data=[go.Pie(
-                    labels=labels,
-                    values=values,
-                    hole=0.4,  # Adiciona um buraco no centro para um gráfico de donut
-                    textinfo='label+percent',  # Exibe rótulos e porcentagens
-                    textfont=dict(size=14),  # Tamanho da fonte dos textos
-                    insidetextorientation='radial',  # Orientação do texto dentro do gráfico
-                    marker=dict(
-                        colors=['#636EFA', '#EF553B'],  # Cores personalizadas
-                        line=dict(color='#000000', width=2)  # Borda das fatias
-                    ),
-                    hoverinfo='label+value+percent'  # Informações ao passar o mouse
-                )])
+    except Cliente.DoesNotExist:
+        datas_uploads = []
 
-                # Estilo do layout do gráfico de pizza
-                fig_pizza.update_layout(
-                    title_text='Distribuição das Ações',  # Título do gráfico
-                    titlefont_size=20,  # Tamanho da fonte do título
-                    showlegend=True,  # Exibe a legenda
-                    legend=dict(
-                        orientation="h",  # Orientação da legenda
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="right",
-                        x=1
-                    )
-                )
-
-                # Criando o gráfico de velocímetro
-                total_actions = sim_count + nao_count
-                if total_actions > 0:
-                    percentage = (sim_count / total_actions) * 100
-                else:
-                    percentage = 0  # Evitar divisão por zero
-
-                
-                # Criando o gráfico de velocímetro com tamanho reduzido
-                fig_velocimetro = go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=percentage,
-                    title={'text': "Velocímetro", 'font': {'size': 16}},  # Título do gráfico com fonte menor
-                    number={'font': {'size': 28, 'color': 'blue'}},  # Número central com fonte menor
-                    gauge={
-                        'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "black"},
-                        'bar': {'color': "darkblue", 'thickness': 0.2},  # Barra mais fina
-                        'bgcolor': "white",
-                        'borderwidth': 1,
-                        'bordercolor': "gray",
-                        'steps': [
-                            {'range': [0, 50], 'color': "LightBlue"},
-                            {'range': [50, 100], 'color': "RoyalBlue"}
-                        ],
-                        'threshold': {
-                            'line': {'color': "red", 'width': 4},
-                            'thickness': 0.75,
-                            'value': 90  # Valor do limite
-                        }
-                    }
-                ))
-
-                # Estilo do layout do gráfico de velocímetro com margens reduzidas
-                fig_velocimetro.update_layout(
-                    title_text="Percentual de Ações 'Sim'",
-                    titlefont_size=16,  # Tamanho da fonte do título reduzido
-                    margin=dict(l=35, r=35, t=30, b=10),  # Margens menores
-                    font=dict(color='black', size=12)  # Fonte geral menor
-                )
-
-                # Criando o gráfico de linha
-                # Recupera todos os uploads associados ao cliente
-                action_data = ActionModel.objects.filter(nome=cliente.nome).order_by('upload_date')
-
-                # Prepare os dados para o gráfico de linha
-                dates = [action.upload_date.strftime('%Y-%m-%d') for action in action_data]
-                sim_counts = [action_data.filter(upload_date=action.upload_date, acao='sim').count() for action in action_data]
-                nao_counts = [action_data.filter(upload_date=action.upload_date, acao='nao').count() for action in action_data]
-
-                # Criando o gráfico de linha
-                fig_linha = go.Figure()
-                fig_linha.add_trace(go.Scatter(
-                    x=dates,
-                    y=sim_counts,
-                    mode='lines+markers',
-                    name='Ações Sim',
-                    line=dict(color='blue', width=2),
-                    marker=dict(size=8)
-                ))
-                fig_linha.add_trace(go.Scatter(
-                    x=dates,
-                    y=nao_counts,
-                    mode='lines+markers',
-                    name='Ações Não',
-                    line=dict(color='red', width=2),
-                    marker=dict(size=8)
-                ))
-
-                # Estilo do layout do gráfico de linha
-                fig_linha.update_layout(
-                    title='Contagem de Ações ao Longo do Tempo',
-                    xaxis_title='Datas',
-                    yaxis_title='Contagem',
-                    titlefont_size=20,
-                    margin=dict(l=40, r=40, t=40, b=40),
-                    font=dict(size=14),
-                    legend=dict(x=0, y=1)
-                )
-
-                # Converte gráficos para HTML
-                grafico_pizza = fig_pizza.to_html(full_html=False)
-                grafico_velocimetro = fig_velocimetro.to_html(full_html=False)
-                grafico_linha = fig_linha.to_html(full_html=False)  # Converte gráfico de linha para HTML
-
-        except Cliente.DoesNotExist:
-            datas_uploads = []
-
-    # Cria uma lista de dados com 'acao' vazio
-    data_with_actions = []
-    for item in data:
-        data_with_actions.append({
-            'id': item.id,
-            'cis_control': item.cis_control,
-            'cis_sub_control': item.cis_sub_control,
-            'tipo_de_ativo': item.tipo_de_ativo,
-            'funcao_de_seguranca': item.funcao_de_seguranca,
-            'titulo': item.titulo,
-            'descricao': item.descricao,
-            'nist_csf': item.nist_csf,
-            'nome_da_subcategoria': item.nome_da_subcategoria,
-            'acao': '',  # Campo 'acao' vazio
-        })
+    data_with_actions = [
+        {
+            'id': item.id, 'cis_control': item.cis_control, 'cis_sub_control': item.cis_sub_control,
+            'tipo_de_ativo': item.tipo_de_ativo, 'funcao_de_seguranca': item.funcao_de_seguranca,
+            'titulo': item.titulo, 'descricao': item.descricao, 'nist_csf': item.nist_csf,
+            'ig': item.ig, 'nome_da_subcategoria': item.nome_da_subcategoria, 'acao': ''
+        } for item in framework.objects.all()
+    ]
 
     return render(request, 'index.html', {
         'data': data_with_actions,
         'column_names': column_names,
-        'datas_uploads': datas_uploads,  # Passa as datas para o template
-        'grafico_pizza': grafico_pizza,  # Passa o gráfico de pizza para o template
-        'grafico_velocimetro': grafico_velocimetro,  # Passa o gráfico de velocímetro para o template
-        'grafico_linha': grafico_linha,  # Passa o gráfico de linha para o template
+        'datas_uploads': datas_uploads,
+        'grafico_pizza': grafico_pizza,
+        'grafico_velocimetro': grafico_velocimetro,
+        'grafico_linha': grafico_linha,
+        'ig_percentages': ig_percentages,
     })
 
+
+def get_unique_upload_dates(cliente):
+    """Obtém datas de upload únicas associadas ao cliente."""
+    return [
+        date.strftime('%Y-%m-%d') 
+        for date in ActionModel.objects.filter(nome=cliente.nome)
+                                       .values_list('upload_date', flat=True)
+                                       .distinct().order_by('upload_date')
+    ]
+
+def create_speedometer_chart(sim_count, nao_count):
+    """Cria o gráfico de velocímetro baseado na porcentagem de ações 'Sim'."""
+    total_actions = sim_count + nao_count
+    percentage = (sim_count / total_actions) * 100 if total_actions > 0 else 0
+    fig_velocimetro = go.Figure(go.Indicator(
+        mode="gauge+number", value=percentage,
+        title={'text': "Velocímetro", 'font': {'size': 16}},
+        number={'font': {'size': 28, 'color': 'blue'}},
+        gauge={
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "black"},
+            'bar': {'color': "darkblue", 'thickness': 0.2},
+            'bgcolor': "white", 'borderwidth': 1, 'bordercolor': "gray",
+            'steps': [
+                {'range': [0, 50], 'color': "LightBlue"},
+                {'range': [50, 100], 'color': "RoyalBlue"}
+            ],
+            'threshold': {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 90}
+        }
+    ))
+    fig_velocimetro.update_layout(
+        title_text="Percentual de Ações 'Sim'", titlefont_size=16,
+        margin=dict(l=35, r=35, t=30, b=10), font=dict(color='black', size=12)
+    )
+    return fig_velocimetro.to_html(full_html=False)
+
+def calculate_ig_percentages(actions):
+    """Calcula a porcentagem de 'Sim' para cada valor distinto de IG, ignorando 'None' e 'Não se aplica'."""
+    ig_percentages = {}
+
+    # Obtém os valores distintos de IG, excluindo os valores None
+    ig_values = actions.values_list('ig', flat=True).exclude(ig=None).distinct()
+
+    for ig in ig_values:
+        # Contagem de "Sim" para o IG atual
+        ig_sim_count = actions.filter(ig=ig, acao='sim').count()
+
+        # Total de ações para o IG atual, excluindo "Não se aplica"
+        ig_total = actions.filter(ig=ig).exclude(acao='nao se aplica').count()
+
+        # Calcula a porcentagem de "Sim" para o IG atual
+        ig_percentage = (ig_sim_count / ig_total) * 100 if ig_total > 0 else 0
+        ig_percentages[ig] = round(ig_percentage, 2)
+
+    return ig_percentages
 
 
 def error_401(request):
@@ -368,7 +275,8 @@ def upload_excel(request):
                 'Título': 'titulo',
                 'Descrição': 'descricao',
                 'NIST CSF': 'nist_csf',
-                'Nome da subcategoria': 'nome_da_subcategoria'
+                'IG': 'ig',  # Adicione o mapeamento da coluna IG
+                'Nome da subcategoria': 'nome_da_subcategoria',
             }
 
             # Verificar se as colunas esperadas estão presentes no DataFrame
@@ -387,7 +295,9 @@ def upload_excel(request):
                     titulo=row['Título'],
                     descricao=row['Descrição'],
                     nist_csf=row['NIST CSF'],
-                    nome_da_subcategoria=row['Nome da subcategoria']
+                    ig=row['IG'], # Adicione IG aqui
+                    nome_da_subcategoria=row['Nome da subcategoria'],
+                    
                 )
             
             # Excluir o arquivo após o upload
@@ -403,6 +313,13 @@ def upload_excel(request):
     return redirect('index')
 
 
+
+import pandas as pd
+from io import BytesIO
+from django.core.files.storage import FileSystemStorage
+from django.utils import timezone
+from django.contrib import messages
+from .models import TemporaryActionModel, ActionModel, framework, Cliente
 
 def update_table(request):
     if request.method == 'POST':
@@ -446,6 +363,7 @@ def update_table(request):
                             'funcao_de_seguranca': framework_item.funcao_de_seguranca,
                             'descricao': framework_item.descricao,
                             'nist_csf': framework_item.nist_csf,
+                            'ig': framework_item.ig,
                             'nome_da_subcategoria': framework_item.nome_da_subcategoria,
                             'upload_date': today
                         }
@@ -455,6 +373,9 @@ def update_table(request):
                     messages.error(request, 'Nenhuma linha foi selecionada para atualizar.')
 
             elif request.POST.get('save') == 'final':
+                # Criar uma lista para armazenar os dados para o Excel
+                data_for_excel = []
+
                 # Enviar para ActionModel
                 for item in framework.objects.all():
                     action = request.POST.get(f'action_{item.id}')
@@ -469,11 +390,45 @@ def update_table(request):
                                 'funcao_de_seguranca': item.funcao_de_seguranca,
                                 'descricao': item.descricao,
                                 'nist_csf': item.nist_csf,
+                                'ig': item.ig,  # Inclui o IG
                                 'nome_da_subcategoria': item.nome_da_subcategoria,
                                 'acao': action
                             }
                         )
-                messages.success(request, 'Tabela enviada com sucesso!')
+
+                        # Adiciona os dados da linha ao array para o Excel
+                        data_for_excel.append({
+                            'cis_control': item.cis_control,
+                            'cis_sub_control': item.cis_sub_control,
+                            'tipo_de_ativo': item.tipo_de_ativo,
+                            'funcao_de_seguranca': item.funcao_de_seguranca,
+                            'titulo': item.titulo,
+                            'descricao': item.descricao,
+                            'nist_csf': item.nist_csf,
+                            'ig': item.ig,
+                            'nome_da_subcategoria': item.nome_da_subcategoria,
+                            'acao': action  # Inclui a coluna 'ação'
+                        })
+
+                # Criar o DataFrame para o Excel
+                df = pd.DataFrame(data_for_excel)
+                df.fillna('', inplace=True)  # Substituir NaN por vazio
+
+                # Gerar o nome do arquivo com o nome do usuário e data
+                filename = f"{nome_cliente}_{today}.xlsx"
+                
+                # Criar o arquivo Excel em memória
+                excel_file = BytesIO()
+                df.to_excel(excel_file, index=False)
+
+                # Rewind o ponteiro do arquivo em memória
+                excel_file.seek(0)
+
+                # Salvar o arquivo no diretório de mídia
+                fs = FileSystemStorage()
+                fs.save(filename, excel_file)
+
+                messages.success(request, f'Tabela enviada com sucesso!')
 
             else:
                 # Salvar toda a tabela no TemporaryActionModel
@@ -491,6 +446,7 @@ def update_table(request):
                             titulo=item.titulo,
                             descricao=item.descricao,
                             nist_csf=item.nist_csf,
+                            ig=item.ig,
                             nome_da_subcategoria=item.nome_da_subcategoria,
                             acao=action,
                             upload_date=today
@@ -506,13 +462,14 @@ def update_table(request):
         return redirect('index')
 
 
+
+
+
+
 def download_actionModel(request):
     # Recebe parâmetros da requisição
     user_name = request.GET.get('user_name')
     submission_date_str = request.GET.get('submission_date')
-
-    # Adiciona logs para depuração
-    print(f"Data recebida: {submission_date_str}")
 
     # Verifica se os parâmetros foram fornecidos
     if not user_name or not submission_date_str:
@@ -523,9 +480,6 @@ def download_actionModel(request):
         submission_date = datetime.strptime(submission_date_str, '%Y-%m-%d').date()
     except ValueError:
         return HttpResponse("Data no formato inválido. Use o formato YYYY-MM-DD.", status=400)
-
-    # Adiciona logs para depuração
-    print(f"Procurando registros para usuário: {user_name} e data: {submission_date}")
 
     # Busca os registros que correspondem ao nome e data fornecidos
     registros = ActionModel.objects.filter(
@@ -539,7 +493,10 @@ def download_actionModel(request):
     # Cria um novo workbook e sheet
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = f"Planilha de {user_name}"
+    
+    # Garantir que o nome da planilha não tenha mais de 31 caracteres
+    sheet_title = f"Planilha de {user_name}"
+    ws.title = sheet_title[:31]  # Truncar o título para 31 caracteres
 
     # Especifica os cabeçalhos das colunas
     headers = [
@@ -550,7 +507,8 @@ def download_actionModel(request):
         "Título", 
         "Descrição",
         "NIST CSF",
-        "Nome da subcategoria"
+        "IG",
+        "Nome da subcategoria",
         "Ação"
     ]
 
@@ -567,16 +525,24 @@ def download_actionModel(request):
         ws.cell(row=row_num, column=5, value=registro.titulo)
         ws.cell(row=row_num, column=6, value=registro.descricao)
         ws.cell(row=row_num, column=7, value=registro.nist_csf)
-        ws.cell(row=row_num, column=8, value=registro.nome_da_subcategoria)
-        ws.cell(row=row_num, column=9, value=registro.acao)
+        ws.cell(row=row_num, column=8, value=registro.ig)
+        ws.cell(row=row_num, column=9, value=registro.nome_da_subcategoria)
+        ws.cell(row=row_num, column=10, value=registro.acao)
 
-    # Cria o arquivo em memória
+    # Criar a resposta HTTP com o arquivo gerado
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename={user_name}_{submission_date}.xlsx'
 
-    # Salva a planilha no response
-    wb.save(response)
+    # Tente forçar a gravação no response
+    try:
+        wb.save(response)
+    except Exception as e:
+        print(f"Erro ao salvar o arquivo Excel: {str(e)}")
+        return HttpResponse("Erro ao gerar o arquivo Excel.", status=500)
+
     return response
+
+
 
 
 def load_temporary_table(request):
@@ -602,7 +568,7 @@ def load_temporary_table(request):
             column_names = [
                 'CIS Control', 'CIS Sub-Control', 'Tipo de ativo',
                 'Função de segurança', 'Título', 'Descrição',
-                'NIST CSF', 'Nome da subcategoria'
+                'NIST CSF','IG','Nome da subcategoria'
             ]
 
             # Mapeia as ações temporárias por título
@@ -620,6 +586,7 @@ def load_temporary_table(request):
                     'titulo': item.titulo,
                     'descricao': item.descricao,
                     'nist_csf': item.nist_csf,
+                    'ig': item.ig,
                     'nome_da_subcategoria': item.nome_da_subcategoria,
                     'acao': temp_actions.get(item.titulo, ''),  # Adiciona a ação correspondente
                 })

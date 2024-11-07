@@ -11479,3 +11479,32 @@ table th {
 .upload-container, .download-container, .consult-container {
   text-align: center;
 }
+
+.ig-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-left: 3px solid green;
+}
+
+.ig-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px;
+  color: #ffffff;
+  font-family: Arial, sans-serif;
+  border-radius: 8px;
+  width: 200px;
+}
+
+.ig-box h3 {
+  margin: 0;
+  font-size: 1.2em;
+}
+
+.ig-box p {
+  margin: 5px 0 0;
+  font-size: 0.9em;
+}

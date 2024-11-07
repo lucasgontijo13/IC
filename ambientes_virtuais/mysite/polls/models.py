@@ -49,6 +49,7 @@ class framework(models.Model):
     titulo = models.CharField(max_length=255)
     descricao = models.TextField()
     nist_csf = models.CharField(max_length=100)
+    ig = models.CharField(max_length=100, blank=True, null=True)
     nome_da_subcategoria = models.CharField(max_length=255)
     upload_date = models.DateField(default=timezone.now)
 
@@ -67,6 +68,7 @@ class ActionModel(models.Model):
     titulo = models.CharField(max_length=255)
     descricao = models.TextField()
     nist_csf = models.CharField(max_length=100)
+    ig = models.CharField(max_length=100, blank=True, null=True)
     nome_da_subcategoria = models.CharField(max_length=255)
     acao = models.CharField(max_length=50, blank=True, null=True)  # Coluna de ação
     upload_date = models.DateField(default=get_current_date)  # Apenas a data
@@ -83,6 +85,7 @@ class TemporaryActionModel(models.Model):
     titulo = models.CharField(max_length=255)
     descricao = models.TextField()
     nist_csf = models.CharField(max_length=100)
+    ig = models.CharField(max_length=100, blank=True, null=True)
     nome_da_subcategoria = models.CharField(max_length=255)
     acao = models.CharField(max_length=50, blank=True, null=True)
     upload_date = models.DateField(default=get_current_date)
