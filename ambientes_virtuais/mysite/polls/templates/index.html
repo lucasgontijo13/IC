@@ -11,6 +11,8 @@
         {% load static %}
         <link href="{% static 'css/styles.css' %}" rel="stylesheet" />
         <script src="https://use.fontawesome.com/releases/v6.3.0/js/all.js" crossorigin="anonymous"></script>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+
     </head>
     <body class="sb-nav-fixed">
         <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
@@ -182,30 +184,56 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- Grafico Linha -->
+                        
                         <div class="row">
-                            <div class="col-xl-6">
+                            <div class="col-xl-12">
                                 <div class="card mb-4">
                                     <div class="card-header">
-                                        <i class="fas fa-chart-line me-1"></i>
-                                        Gráfico em branco
+                                        <i class="fas fa-database me-1"></i>
+                                        Adesão por Tipos de Ativo
                                     </div>
-                                    
-                                </div>
-                            </div>
-                            
-                            <!-- Grafico em branco -->
-                            <div class="col-xl-6">
-                                <div class="card mb-4">
-                                    <div class="card-header">
-                                        <i class="fas fa-tachometer-alt me-1"></i> Grafico em branco
+                                    <div class="card-body d-flex">
+                                        <!-- Sidebar para os tipos de ativo -->
+                                        <div class="asset-types-container" style="width: 100%; display: flex; flex-wrap: nowrap; gap: 15px;">
+                                            {% for tipo, counts in asset_type_counts.items %}
+                                                <div class="asset-card" style="flex: 1 1 16%; min-width: 150px; max-width: 200px; text-align: center; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
+                                                    <!-- Ícone correspondente ao tipo de ativo -->
+                                                    <i class="{% if tipo == '' or tipo == None %}fas fa-arrows-alt
+                                                    {% elif tipo|lower == 'formulários' %}fas fa-laptop-code
+                                                    {% elif tipo|lower == 'dados' %}fas fa-database
+                                                    {% elif tipo|lower == 'dispositivos' %}fas fa-mobile-alt
+                                                    {% elif tipo|lower == 'usuários' %}fas fa-user
+                                                    {% elif tipo|lower == 'rede' %}fas fa-globe
+                                                    {% else %}fas fa-question{% endif %} icon-size"></i>
+                                                                                                                                                            
+                                                    <!-- Exibe "N/A" caso o tipo esteja vazio -->
+                                                    <h5 class="mt-2">{{ tipo|default:"N/A" }}</h5>
+                                                    <p>{{ counts.sim_count }} / {{ counts.total }}</p>
+                                                    
+                                                </div>
+                                            {% endfor %}
+                                        </div>
                                     </div>
-                                    
                                 </div>
                             </div>
                         </div>
-                    
-                        <!-- Gráfico de Pizza -->
+                        
+                        <div class="row">
+                            <div class="col-xl-12">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <i class="fas fa-database me-1"></i>
+                                        Gráfico por Controle
+                                    </div>
+                                    <div class="card-body d-flex">
+                                        {{ grafico_controle|safe }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <!-- Gráfico de velocimentro -->
                         <div class="row">
                             <div class="col-xl-12">
                                 <div class="card mb-4">
@@ -241,7 +269,6 @@
                                     </div>
                                 </div>
                             </div>
-
                         </div>
                         
                         

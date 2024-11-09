@@ -20,6 +20,9 @@ from openpyxl import Workbook
 from .models import TemporaryActionModel
 import plotly.graph_objs as go
 import plotly.graph_objects as go
+from io import BytesIO
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 logger = logging.getLogger('django')
 
@@ -32,9 +35,10 @@ def index(request):
         'NIST CSF', 'IG', 'Nome da subcategoria'
     ]
 
-    grafico_pizza = grafico_velocimetro = grafico_linha = None
+    grafico_pizza = grafico_velocimetro = grafico_linha = grafico_controle = None
     email = request.user.username
     ig_percentages = {}
+    asset_type_counts = {}
 
     try:
         cliente = Cliente.objects.get(email=email)
@@ -49,8 +53,13 @@ def index(request):
             nao_count = actions.filter(acao='nao').count()
             grafico_velocimetro = create_speedometer_chart(sim_count, nao_count)
 
-            # Calcula as porcentagens de IG chamando a nova função
+           
+
+            # Calcula as porcentagens de IG
             ig_percentages = calculate_ig_percentages(actions)
+
+            # Calcula as contagens de tipo de ativo
+            asset_type_counts = calculate_asset_type_counts(actions)
 
     except Cliente.DoesNotExist:
         datas_uploads = []
@@ -71,8 +80,13 @@ def index(request):
         'grafico_pizza': grafico_pizza,
         'grafico_velocimetro': grafico_velocimetro,
         'grafico_linha': grafico_linha,
+        'grafico_controle': grafico_controle,
         'ig_percentages': ig_percentages,
+        'asset_type_counts': asset_type_counts,
     })
+
+
+
 
 
 def get_unique_upload_dates(cliente):
@@ -130,6 +144,30 @@ def calculate_ig_percentages(actions):
     return ig_percentages
 
 
+def calculate_asset_type_counts(actions):
+    """Calcula a contagem de 'Sim' e o total para cada tipo de ativo."""
+    asset_type_counts = {}
+
+    # Obtém os tipos de ativo distintos
+    asset_types = actions.values_list('tipo_de_ativo', flat=True).distinct()
+
+    for tipo in asset_types:
+        # Conta quantos registros têm 'Sim' e o total, ignorando 'Não se aplica'
+        tipo_sim_count = actions.filter(tipo_de_ativo=tipo, acao='sim').count()
+        tipo_total = actions.filter(tipo_de_ativo=tipo).exclude(acao='nao se aplica').count()
+        
+        asset_type_counts[tipo] = {
+            'sim_count': tipo_sim_count,
+            'total': tipo_total
+        }
+
+    return asset_type_counts
+
+
+
+
+
+
 def error_401(request):
     return render(request, '401.html')
 
@@ -173,7 +211,6 @@ def logout_view(request):
     
     django_logout(request)
     return redirect('login')
-
 
 def registro_view(request):
     if request.method == 'POST':
@@ -239,6 +276,7 @@ def login_view(request):
             messages.error(request, 'Email ou senha incorretos')
     
     return render(request, 'login.html')
+
 
 
 def upload_excel(request):
@@ -314,17 +352,11 @@ def upload_excel(request):
 
 
 
-import pandas as pd
-from io import BytesIO
-from django.core.files.storage import FileSystemStorage
-from django.utils import timezone
-from django.contrib import messages
-from .models import TemporaryActionModel, ActionModel, framework, Cliente
-
 def update_table(request):
     if request.method == 'POST':
         try:
             today = timezone.now().date()
+            #today = "2024-11-10"
             user = request.user
             nome_cliente = 'Desconhecido'
 
@@ -336,22 +368,17 @@ def update_table(request):
                 except Cliente.DoesNotExist:
                     pass
 
-            # Verificar se uma ação foi enviada para salvar temporariamente
             if request.POST.get('save') == 'temporary':
-                item_id = request.POST.get('editId')  # Pega o 'editId'
-                
-                # Verificar se a ação para o item foi passada corretamente
+                item_id = request.POST.get('editId')
                 new_action = request.POST.get(f'action_{item_id}')
                 
                 if item_id and new_action:
-                    # Verificar se o item existe no framework
                     try:
                         framework_item = framework.objects.get(id=item_id)
                     except framework.DoesNotExist:
                         messages.error(request, 'Item do framework não encontrado.')
                         return redirect('index')
 
-                    # Atualizar ou criar a ação temporária
                     TemporaryActionModel.objects.update_or_create(
                         nome=nome_cliente,
                         titulo=framework_item.titulo,
@@ -373,84 +400,79 @@ def update_table(request):
                     messages.error(request, 'Nenhuma linha foi selecionada para atualizar.')
 
             elif request.POST.get('save') == 'final':
-                # Criar uma lista para armazenar os dados para o Excel
                 data_for_excel = []
+                saved_count = 0
 
-                # Enviar para ActionModel
                 for item in framework.objects.all():
-                    action = request.POST.get(f'action_{item.id}')
-                    if action:  # Apenas envia se houver uma ação
-                        # Verifica se já existe uma entrada para o usuário e data atual
-                        ActionModel.objects.update_or_create(
-                            upload_date=today, nome=nome_cliente, titulo=item.titulo,
-                            defaults={
-                                'cis_control': item.cis_control,
-                                'cis_sub_control': item.cis_sub_control,
-                                'tipo_de_ativo': item.tipo_de_ativo,
-                                'funcao_de_seguranca': item.funcao_de_seguranca,
-                                'descricao': item.descricao,
-                                'nist_csf': item.nist_csf,
-                                'ig': item.ig,  # Inclui o IG
-                                'nome_da_subcategoria': item.nome_da_subcategoria,
-                                'acao': action
-                            }
-                        )
-
-                        # Adiciona os dados da linha ao array para o Excel
-                        data_for_excel.append({
+                    action = request.POST.get(f'action_{item.id}', '')
+                    action_obj, created = ActionModel.objects.update_or_create(
+                        upload_date=today, nome=nome_cliente, titulo=item.titulo, cis_sub_control=item.cis_sub_control,
+                        defaults={
                             'cis_control': item.cis_control,
-                            'cis_sub_control': item.cis_sub_control,
                             'tipo_de_ativo': item.tipo_de_ativo,
                             'funcao_de_seguranca': item.funcao_de_seguranca,
-                            'titulo': item.titulo,
                             'descricao': item.descricao,
                             'nist_csf': item.nist_csf,
                             'ig': item.ig,
                             'nome_da_subcategoria': item.nome_da_subcategoria,
-                            'acao': action  # Inclui a coluna 'ação'
-                        })
+                            'acao': action
+                        }
+                    )
+                    if created:
+                        saved_count += 1
 
-                # Criar o DataFrame para o Excel
+                    data_for_excel.append({
+                        'cis_control': item.cis_control,
+                        'cis_sub_control': item.cis_sub_control,
+                        'tipo_de_ativo': item.tipo_de_ativo,
+                        'funcao_de_seguranca': item.funcao_de_seguranca,
+                        'titulo': item.titulo,
+                        'descricao': item.descricao,
+                        'nist_csf': item.nist_csf,
+                        'ig': item.ig,
+                        'nome_da_subcategoria': item.nome_da_subcategoria,
+                        'acao': action
+                    })
+
+                print(f"{saved_count} itens salvos no ActionModel.")
+
                 df = pd.DataFrame(data_for_excel)
-                df.fillna('', inplace=True)  # Substituir NaN por vazio
+                df.fillna('', inplace=True)
 
-                # Gerar o nome do arquivo com o nome do usuário e data
                 filename = f"{nome_cliente}_{today}.xlsx"
-                
-                # Criar o arquivo Excel em memória
+                file_path = f"media/{filename}"
+
+                # Verificar se o arquivo já existe e, se sim, removê-lo
+                if default_storage.exists(file_path):
+                    default_storage.delete(file_path)
+
+                # Criar o arquivo Excel e salvar
                 excel_file = BytesIO()
                 df.to_excel(excel_file, index=False)
-
-                # Rewind o ponteiro do arquivo em memória
                 excel_file.seek(0)
+                default_storage.save(file_path, ContentFile(excel_file.read()))
 
-                # Salvar o arquivo no diretório de mídia
-                fs = FileSystemStorage()
-                fs.save(filename, excel_file)
-
-                messages.success(request, f'Tabela enviada com sucesso!')
+                messages.success(request, 'Tabela enviada com sucesso!')
 
             else:
-                # Salvar toda a tabela no TemporaryActionModel
                 TemporaryActionModel.objects.filter(nome=nome_cliente).delete()
                 
                 for item in framework.objects.all():
-                    action = request.POST.get(f'action_{item.id}')
-                    if action:
-                        TemporaryActionModel.objects.create(
-                            nome=nome_cliente,
-                            cis_control=item.cis_control,
-                            cis_sub_control=item.cis_sub_control,
-                            tipo_de_ativo=item.tipo_de_ativo,
-                            funcao_de_seguranca=item.funcao_de_seguranca,
-                            titulo=item.titulo,
-                            descricao=item.descricao,
-                            nist_csf=item.nist_csf,
-                            ig=item.ig,
-                            nome_da_subcategoria=item.nome_da_subcategoria,
-                            acao=action,
-                            upload_date=today
-                        )
+                    action = request.POST.get(f'action_{item.id}', '')
+                    TemporaryActionModel.objects.create(
+                        nome=nome_cliente,
+                        cis_control=item.cis_control,
+                        cis_sub_control=item.cis_sub_control,
+                        tipo_de_ativo=item.tipo_de_ativo,
+                        funcao_de_seguranca=item.funcao_de_seguranca,
+                        titulo=item.titulo,
+                        descricao=item.descricao,
+                        nist_csf=item.nist_csf,
+                        ig=item.ig,
+                        nome_da_subcategoria=item.nome_da_subcategoria,
+                        acao=action,
+                        upload_date=today
+                    )
 
                 messages.success(request, 'Tabela salva temporariamente com sucesso!')
 
@@ -460,11 +482,6 @@ def update_table(request):
         return redirect('index')
     else:
         return redirect('index')
-
-
-
-
-
 
 def download_actionModel(request):
     # Recebe parâmetros da requisição
@@ -541,9 +558,6 @@ def download_actionModel(request):
         return HttpResponse("Erro ao gerar o arquivo Excel.", status=500)
 
     return response
-
-
-
 
 def load_temporary_table(request):
     # Verifica se o usuário está autenticado

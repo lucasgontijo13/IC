@@ -11508,3 +11508,39 @@ table th {
   margin: 5px 0 0;
   font-size: 0.9em;
 }
+
+.asset-types-container {
+    display: flex;
+    flex-wrap: nowrap; /* Impede a quebra de linha */
+    overflow-x: auto; /* Permite rolagem horizontal, se necessário */
+    gap: 15px;
+    justify-content: center;
+}
+
+.asset-types-container {
+  display: flex;
+  flex-wrap: nowrap; /* Impede a quebra de linha */
+  overflow-x: auto; /* Permite rolagem horizontal, se necessário */
+  gap: 15px;
+}
+
+.asset-card {
+  flex: 1 1 auto; /* Faz os cards ocuparem o espaço disponível */
+  max-width: 150px; /* Define um tamanho máximo para os cards */
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1);
+  background-color: #f8f9fa;
+  text-align: center;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+.icon-size {
+  font-size: 2em;
+  color: #333;
+}
+
+.adopters-label {
+  font-size: 0.9em;
+  color: #888;
+}
