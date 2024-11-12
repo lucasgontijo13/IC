@@ -110,3 +110,106 @@ $(document).ready(function() {
         }
     });
 });
+
+
+
+
+document.addEventListener("DOMContentLoaded", function () {
+    document.getElementById("exportPNG").addEventListener("click", function () {
+        console.log("Botão Exportar como PNG clicado.");
+        const modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+        modal.hide();
+        exportGraphsAsPNG();
+    });
+
+    document.getElementById("exportPDF").addEventListener("click", function () {
+        console.log("Botão Exportar como PDF clicado.");
+        const modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+        modal.hide();
+        exportGraphsAsPDF();
+    });
+
+    // Função para exportar gráficos como PNG
+    function exportGraphsAsPNG() {
+        const graphsContainer = document.getElementById("graphsContainer"); 
+        if (!graphsContainer) {
+            console.error("Contêiner de gráficos não encontrado.");
+            return;
+        }
+
+        // Forçar a rolagem para o início para garantir que toda a área do gráfico seja visível
+        graphsContainer.scrollLeft = 0;
+
+        // Captura toda a área do gráfico, incluindo a parte à esquerda
+        html2canvas(graphsContainer, {
+            useCORS: true,  // Permite carregar imagens de outros domínios, se necessário
+            scale: 2,       // Aumenta a resolução da imagem
+            x: 0,           // Posição x para captura
+            y: 0,           // Posição y para captura
+            width: graphsContainer.scrollWidth,  // Largura total do gráfico (não limitada pela área visível)
+            height: graphsContainer.scrollHeight, // Altura total do gráfico
+            scrollX: 0,     // Ignora a rolagem horizontal
+            scrollY: 0      // Ignora a rolagem vertical
+        }).then(canvas => {
+            console.log("Canvas criado para exportação PNG.");
+            const link = document.createElement("a");
+            link.href = canvas.toDataURL("image/png");
+            link.download = "graficos.png";
+            link.click();
+        }).catch(error => {
+            console.error("Erro ao exportar como PNG:", error);
+        });
+    }
+
+    // Função para exportar gráficos como PDF
+    async function exportGraphsAsPDF() {
+        console.log("Botão Exportar como PDF clicado.");
+        const graphsContainer = document.getElementById("graphsContainer");
+        if (!graphsContainer) {
+            console.error("Contêiner de gráficos não encontrado.");
+            return;
+        }
+
+        console.log("Canvas criado para exportação PDF.");
+
+        // Forçar a rolagem para o início para garantir que toda a área do gráfico seja visível
+        graphsContainer.scrollLeft = 0;
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF();
+        const pageWidth = pdf.internal.pageSize.getWidth(); 
+        const pageHeight = pdf.internal.pageSize.getHeight(); 
+
+        await html2canvas(graphsContainer, {
+            useCORS: true,  // Permite carregar imagens de outros domínios, se necessário
+            scale: 2,       // Aumenta a resolução da imagem
+            x: 0,           // Posição x para captura
+            y: 0,           // Posição y para captura
+            width: graphsContainer.scrollWidth,  // Largura total do gráfico (não limitada pela área visível)
+            height: graphsContainer.scrollHeight, // Altura total do gráfico
+            scrollX: 0,     // Ignora a rolagem horizontal
+            scrollY: 0      // Ignora a rolagem vertical
+        }).then((canvas) => {
+            const imgData = canvas.toDataURL("image/png");
+
+            const imgWidth = pageWidth - 20; 
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            if (imgHeight > pageHeight - 20) { 
+                const adjustedImgHeight = pageHeight - 20;
+                const adjustedImgWidth = (canvas.width * adjustedImgHeight) / canvas.height;
+                pdf.addImage(imgData, "PNG", (pageWidth - adjustedImgWidth) / 2, 10, adjustedImgWidth, adjustedImgHeight);
+            } else {
+                pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+            }
+
+            console.log("Imagem adicionada ao PDF em uma única página.");
+            pdf.save("graficos.pdf");
+        }).catch(error => {
+            console.error("Erro ao gerar canvas para PDF:", error);
+        });
+    }
+});
+
+
+

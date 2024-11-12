@@ -23,6 +23,13 @@ import plotly.graph_objects as go
 from io import BytesIO
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+import plotly.io as pio
+from django.http import FileResponse
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import tempfile
+
+
 
 logger = logging.getLogger('django')
 
@@ -30,40 +37,42 @@ logger = logging.getLogger('django')
 logger = logging.getLogger(__name__)
 
 def index(request):
+    # Suas variáveis e lógica atuais
     column_names = [
         'Control', 'Sub-Control', 'Ativo', 'Função de segurança', 'Título', 'Descrição',
         'NIST CSF', 'IG', 'Nome da subcategoria'
     ]
-
     grafico_pizza = grafico_velocimetro = grafico_linha = grafico_controle = None
     email = request.user.username
     ig_percentages = {}
     asset_type_counts = {}
+    selected_date = None  # Inicializando a variável selected_date
 
     try:
         cliente = Cliente.objects.get(email=email)
         datas_uploads = get_unique_upload_dates(cliente)
 
         if request.method == 'POST':
-            selected_date = request.POST.get('selected_date')
-            actions = ActionModel.objects.filter(upload_date=selected_date, nome=cliente.nome)
+            selected_date = request.POST.get('selected_date')  # Captura a data selecionada
+            if selected_date:
+                actions = ActionModel.objects.filter(upload_date=selected_date, nome=cliente.nome)
 
-            # Contagem para o gráfico de velocímetro
-            sim_count = actions.filter(acao='sim').count()
-            nao_count = actions.filter(acao='nao').count()
-            grafico_velocimetro = create_speedometer_chart(sim_count, nao_count)
+                # Gráfico de velocímetro
+                sim_count = actions.filter(acao='sim').count()
+                nao_count = actions.filter(acao='nao').count()
+                grafico_velocimetro = create_speedometer_chart(sim_count, nao_count)
 
-           
+                # Calcula as porcentagens de IG e contagem de tipo de ativo
+                ig_percentages = calculate_ig_percentages(actions)
+                asset_type_counts = calculate_asset_type_counts(actions)
 
-            # Calcula as porcentagens de IG
-            ig_percentages = calculate_ig_percentages(actions)
-
-            # Calcula as contagens de tipo de ativo
-            asset_type_counts = calculate_asset_type_counts(actions)
+                # Gráfico de linha por controle
+                grafico_controle = create_control_chart(actions)
 
     except Cliente.DoesNotExist:
         datas_uploads = []
 
+    # Data com as ações, estará disponível sempre, mas os gráficos dependem da seleção da data
     data_with_actions = [
         {
             'id': item.id, 'cis_control': item.cis_control, 'cis_sub_control': item.cis_sub_control,
@@ -77,9 +86,8 @@ def index(request):
         'data': data_with_actions,
         'column_names': column_names,
         'datas_uploads': datas_uploads,
-        'grafico_pizza': grafico_pizza,
+        'selected_date': selected_date,  # Passa a data selecionada para o template
         'grafico_velocimetro': grafico_velocimetro,
-        'grafico_linha': grafico_linha,
         'grafico_controle': grafico_controle,
         'ig_percentages': ig_percentages,
         'asset_type_counts': asset_type_counts,
@@ -89,10 +97,16 @@ def index(request):
 
 
 
+
+
+
 def get_unique_upload_dates(cliente):
-    """Obtém datas de upload únicas associadas ao cliente."""
+    """Obtém datas de upload únicas associadas ao cliente no formato d/m/Y para exibição."""
     return [
-        date.strftime('%Y-%m-%d') 
+        {
+            'value': date.strftime('%Y-%m-%d'),       # Formato original para envio
+            'display': date.strftime('%d/%m/%Y')      # Formato d/m/Y para exibição
+        }
         for date in ActionModel.objects.filter(nome=cliente.nome)
                                        .values_list('upload_date', flat=True)
                                        .distinct().order_by('upload_date')
@@ -162,6 +176,113 @@ def calculate_asset_type_counts(actions):
         }
 
     return asset_type_counts
+
+
+
+def create_control_chart(actions):
+    controls = list(range(1, 21))
+    control_titles = [
+        "   Inventário e Controle de<br>   Ativos de Hardware", "   Inventário e Controle de<br>   Ativos de Software",
+        "   Gerenciamento contínuo<br>   de vulnerabilidades", "   Uso controlado de<br>   privilégios administrativos",
+        "   Configuração segura para hardware<br>   e software em dispositivos móveis,<br>   laptops,estações de trabalho e servidores",
+        "   Manutenção, Monitoramento e Análise de <br>   registros de Auditoria", "   Proteção de e-mail e<br>   navegador da Web",
+        "   Defesas contra malware", "   Limitação e Controle de Portas,<br>   Protocolos e<br>   Serviços de Rede",
+        "   Capacidades de<br>   recuperação de dados", "   Configuração Segura para Rede Dispositivos,<br>   como Firewalls, Roteadores e Switches",
+        "   Defesa de Limites", "   Proteção de Dados", "   Acesso controlado com<br>   base na necessidade de saber",
+        "   Controle de acesso<br>   sem fio", "   Monitoramento e Controle<br>   de Contas",
+        "   Implementar um programa de<br>   treinamento e conscientização<br>   de segurança", "   Segurança de Software<br>   de Aplicação",
+        "   Resposta e Gerenciamento<br>   de Incidentes", "   Testes de Penetração<br>   e Exercícios de Equipe Vermelha"
+    ]
+
+    # Calcula a meta para cada controle como (total de campos - campos "não se aplica")
+    metas = []
+    sim_counts = []
+    for control in controls:
+        total_campos = actions.filter(cis_control=control).count()
+        nao_se_aplica = actions.filter(cis_control=control, acao='não se aplica').count()
+        meta = total_campos - nao_se_aplica
+        metas.append(meta)
+        
+        # Conta o número de "Sim" para cada controle
+        sim_count = actions.filter(cis_control=control, acao='sim').count()
+        sim_counts.append(sim_count)
+
+    # Cria o gráfico de barras
+    fig = go.Figure()
+
+    # Adiciona as barras com os valores "Sim"
+    fig.add_trace(go.Bar(
+        x=control_titles,
+        y=sim_counts,
+        text=sim_counts,
+        textposition='inside',
+        insidetextanchor='start',  # Centraliza o texto na parte inferior da barra
+        name='Aderência',
+        marker=dict(color="rgb(0, 51, 102)", line=dict(color="rgb(0, 51, 102)", width=2)),
+        textfont=dict(size=14, color="white")  # Aumenta a fonte e coloca a cor do texto como branca para melhor contraste
+    ))
+
+    # Adiciona a linha de meta para cada controle
+    fig.add_trace(go.Scatter(
+        x=control_titles,
+        y=metas,
+        mode='lines',
+        name='Meta',
+        line=dict(color='rgb(78, 177, 210)', width=2)  # Linha contínua em azul claro, sem marcadores
+    ))
+
+    # Adiciona os valores das metas acima da linha, com um pequeno deslocamento ajustando o valor de y
+    fig.add_trace(go.Scatter(
+        x=control_titles,
+        y=[meta + 0.5 for meta in metas],  # Adiciona 2 de deslocamento aos valores das metas
+        mode='text',
+        text=metas,
+        textposition='top center',
+        showlegend=False,  # Não exibe esta entrada na legenda
+        textfont=dict(size=12, color="black")
+    ))
+
+    # Configurações do layout
+    fig.update_layout(
+        title={
+            'text': "Aderência do CIS Controls por Categoria vs Meta",
+            'x': 0.5,  # Centraliza o título
+            'xanchor': 'center',
+            'font': {'size': 20}  # Aumenta o tamanho da fonte do título
+        },
+        #xaxis_title="Controle",
+        #yaxis_title="Número de 'Sim'",
+        yaxis=dict(range=[0, max(max(sim_counts), max(metas)) + 5]),  # Ajusta o limite do eixo y
+        showlegend=True,
+        barmode='group',
+        bargap=0.5,  # Aumenta o espaçamento entre as barras
+        template="plotly_white",
+        width=1100,  # Aumenta a largura do gráfico
+        height=800   # Aumenta a altura do gráfico
+    )
+
+    # Ajusta a rotação, o alinhamento e o espaçamento dos títulos no eixo X
+    fig.update_xaxes(
+        tickangle=90,  # Rotaciona os rótulos
+        tickfont=dict(size=14),  # Aumenta a fonte dos rótulos do eixo x
+        tickvals=control_titles,
+        ticktext=control_titles,
+        titlefont=dict(size=16),  # Aumenta o título do eixo x
+        title_standoff=50,  # Ajusta o espaçamento do título do eixo X em relação aos rótulos
+        
+    )
+
+    # Ajusta as margens para garantir que os rótulos não fiquem grudados
+    fig.update_layout(margin=dict(l=50, r=40, t=80, b=150))  # Aumenta a margem inferior
+
+    return fig.to_html(full_html=False)
+
+
+
+
+
+
+
 
 
 
