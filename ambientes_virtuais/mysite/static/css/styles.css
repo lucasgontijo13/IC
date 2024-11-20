@@ -11557,3 +11557,15 @@ table th {
   padding: 10px;            /* Espaçamento ao redor do gráfico */
 }
 
+.no-data-message {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ff4d4d;
+  background-color: #fff4f4;
+  border: 1px solid #ffcccc;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  margin-top: 20px;
+}

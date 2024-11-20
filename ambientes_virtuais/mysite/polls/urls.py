@@ -25,6 +25,6 @@ urlpatterns = [
     path('create_speedometer_chart/', views.create_speedometer_chart, name='create_speedometer_chart'),
     path('get_unique_upload_dates/', views.get_unique_upload_dates, name='get_unique_upload_dates'),
 
-
+ 
     path('accounts/', include('allauth.urls')),
 ]

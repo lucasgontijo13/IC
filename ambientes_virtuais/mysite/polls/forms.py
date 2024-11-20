@@ -1,33 +1,27 @@
 from django import forms
-from django.db import IntegrityError
-from .models import Cliente, Login
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth import get_user_model
 from django.utils import timezone
+from .models import Cliente, Login
+from django.core.exceptions import ValidationError
+from django.contrib.auth import authenticate
+
+User = get_user_model()
 
 class ClienteForm(forms.ModelForm):
-    confirmar_senha = forms.CharField(
-        widget=forms.PasswordInput(attrs={'placeholder': 'Confirme sua senha'}),
-        label='Confirme sua senha'
-    )
+    primeiro_nome = forms.CharField(max_length=50, label='Primeiro Nome')
+    sobrenome = forms.CharField(max_length=50, label='Sobrenome')
+    email = forms.EmailField(label='Email')
+    senha = forms.CharField(widget=forms.PasswordInput, label='Senha')
+    confirmar_senha = forms.CharField(widget=forms.PasswordInput, label='Confirme sua senha')
 
     class Meta:
         model = Cliente
-        fields = ['nome', 'email', 'cnpj', 'senha']
-        widgets = {
-            'senha': forms.PasswordInput(attrs={'placeholder': 'Digite sua senha'}),
-        }
-
-    def clean_senha(self):
-        senha = self.cleaned_data.get('senha')
-        if senha:
-            if len(senha) != 8:
-                raise forms.ValidationError("A senha deve ter exatamente 8 caracteres.")
-        return senha
+        fields = ['cnpj', 'primeiro_nome', 'sobrenome', 'email', 'senha', 'confirmar_senha']
 
     def clean_cnpj(self):
         cnpj = self.cleaned_data.get('cnpj')
-        if cnpj and len(cnpj) != 14:
-            raise forms.ValidationError("O CNPJ deve ter exatamente 14 dígitos.")
+        if not cnpj.isdigit() or len(cnpj) != 14:
+            raise ValidationError("O CNPJ deve ter exatamente 14 dígitos numéricos.")
         return cnpj
 
     def clean(self):
@@ -36,31 +30,44 @@ class ClienteForm(forms.ModelForm):
         confirmar_senha = cleaned_data.get('confirmar_senha')
 
         if senha and confirmar_senha and senha != confirmar_senha:
-            self.add_error('confirmar_senha', 'As senhas não coincidem.')
-
+            self.add_error('confirmar_senha', "As senhas não coincidem.")  # Associa o erro ao campo 'confirmar_senha'
         return cleaned_data
 
     def save(self, commit=True):
         cliente = super().save(commit=False)
         senha = self.cleaned_data.get('senha')
-        
-        if senha:
-            cliente.senha = make_password(senha)
-        
+        email = self.cleaned_data.get('email')
+        primeiro_nome = self.cleaned_data.get('primeiro_nome')
+        sobrenome = self.cleaned_data.get('sobrenome')
+
         if commit:
-            if not cliente.data_cadastro:
-                cliente.data_cadastro = timezone.now()  # Adiciona a data de cadastro
-            cliente.save()
-            # Criar uma nova entrada de Login
-            Login.objects.create(
-                cliente=cliente,
-                data_time=timezone.now(),
-                descricao='Realizou Cadastro'
+            # Criar o usuário do Django
+            user = User.objects.create_user(
+                username=email,  # O username será o email
+                password=senha,
+                first_name=primeiro_nome,
+                last_name=sobrenome,
+                email=email
             )
-        
+            cliente.user = user
+            cliente.save()
         return cliente
-    
+
+
+
+
 class LoginForm(forms.Form):
     email = forms.EmailField(label='Email', max_length=255)
     password = forms.CharField(label='Senha', widget=forms.PasswordInput)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        email = cleaned_data.get('email')
+        password = cleaned_data.get('password')
+
+        if email and password:
+            # Autentica o usuário com email e senha
+            user = authenticate(username=email, password=password)
+            if user is None:
+                raise forms.ValidationError("Email ou senha inválidos.")
+        return cleaned_data

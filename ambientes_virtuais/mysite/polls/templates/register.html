@@ -109,21 +109,41 @@
                                 <div class="card-body">
                                     <form method="post">
                                         {% csrf_token %}
+                                        {% if form.non_field_errors %}
+                                            <div class="alert alert-danger">
+                                                {% for error in form.non_field_errors %}
+                                                    <p>{{ error }}</p>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
                                         <div class="row mb-3">
-                                            <div class="form-floating">
+                                            <div class="col-md-6">
                                                 <div class="form-floating mb-3 mb-md-0">
-                                                    <input name="nome" class="form-control{% if form.nome.errors %} is-invalid{% endif %}" id="inputFirstName" type="text" placeholder="Digite seu nome" value="{{ form.nome.value|default_if_none:'' }}" />
-                                                    <label for="inputFirstName">Nome Completo</label>
-                                                    {% if form.nome.errors %}
+                                                    <input name="primeiro_nome" class="form-control{% if form.primeiro_nome.errors %} is-invalid{% endif %}" id="inputFirstName" type="text" placeholder="Digite seu primeiro nome" value="{{ form.primeiro_nome.value|default_if_none:'' }}" />
+                                                    <label for="inputFirstName">Primeiro Nome</label>
+                                                    {% if form.primeiro_nome.errors %}
                                                         <div class="invalid-feedback">
-                                                            {% for error in form.nome.errors %}
+                                                            {% for error in form.primeiro_nome.errors %}
                                                                 <p>{{ error }}</p>
                                                             {% endfor %}
                                                         </div>
                                                     {% endif %}
                                                 </div>
                                             </div>
-                                        </div>
+                                            <div class="col-md-6">
+                                                <div class="form-floating mb-3 mb-md-0">
+                                                    <input name="sobrenome" class="form-control{% if form.sobrenome.errors %} is-invalid{% endif %}" id="inputLastName" type="text" placeholder="Digite seu sobrenome" value="{{ form.sobrenome.value|default_if_none:'' }}" />
+                                                    <label for="inputLastName">Sobrenome</label>
+                                                    {% if form.sobrenome.errors %}
+                                                        <div class="invalid-feedback">
+                                                            {% for error in form.sobrenome.errors %}
+                                                                <p>{{ error }}</p>
+                                                            {% endfor %}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>                                        
                                         <div class="row mb-3">
                                             <div class="form-floating">
                                                 <div class="form-floating mb-3 mb-md-0">
@@ -166,7 +186,7 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="form-floating mb-3 mb-md-0">
-                                                    <input name="confirmar_senha" class="form-control{% if form.confirmar_senha.errors %} is-invalid{% endif %}" id="inputPasswordConfirm" type="password" placeholder="Confirme sua senha" value="{{ form.confirmar_senha.value|default_if_none:'' }}" />
+                                                    <input name="confirmar_senha" class="form-control{% if form.confirmar_senha.errors %} is-invalid{% endif %}" id="inputPasswordConfirm" type="password" placeholder="Confirme sua senha" />
                                                     <label for="inputPasswordConfirm">Confirme sua senha</label>
                                                     {% if form.confirmar_senha.errors %}
                                                         <div class="invalid-feedback">

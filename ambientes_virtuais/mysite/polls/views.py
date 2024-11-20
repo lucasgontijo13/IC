@@ -1,68 +1,72 @@
 import logging,os
 from django.shortcuts import render, redirect
-from .forms import ClienteForm
+from .forms import ClienteForm, LoginForm
 from django.db import IntegrityError
 from django.contrib import messages
 from django.core.files.storage import FileSystemStorage
 import pandas as pd
 from .models import Cliente, Login , framework, ActionModel
-from django.contrib.auth.hashers import check_password
-from django.contrib.auth.models import User
-from django.contrib.auth import login
 from django.contrib.auth import logout as django_logout
 from django.utils import timezone
 from django.contrib.auth import authenticate, login as auth_login
 import openpyxl
 from django.http import HttpResponse
 from datetime import datetime
-from django.contrib.auth import login, get_user_model
-from openpyxl import Workbook
 from .models import TemporaryActionModel
 import plotly.graph_objs as go
 import plotly.graph_objects as go
 from io import BytesIO
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-import plotly.io as pio
-from django.http import FileResponse
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-import tempfile
-
-
+from django.contrib.auth.decorators import login_required
+from django.conf import settings
+from django.contrib.auth import login as auth_login
 
 logger = logging.getLogger('django')
 
 
 logger = logging.getLogger(__name__)
 
+
+@login_required(login_url='login')
 def index(request):
-    # Suas variáveis e lógica atuais
     column_names = [
         'Control', 'Sub-Control', 'Ativo', 'Função de segurança', 'Título', 'Descrição',
         'NIST CSF', 'IG', 'Nome da subcategoria'
     ]
-    grafico_pizza = grafico_velocimetro = grafico_linha = grafico_controle = None
-    email = request.user.username
+
+    # Inicialização das variáveis
+    grafico_velocimetro = None
+    grafico_controle = None
     ig_percentages = {}
     asset_type_counts = {}
-    selected_date = None  # Inicializando a variável selected_date
+    datas_uploads = []
+    selected_date = None
 
+    # Recupera o cliente pelo usuário autenticado
     try:
-        cliente = Cliente.objects.get(email=email)
-        datas_uploads = get_unique_upload_dates(cliente)
+        user = request.user
+        # Obtém o nome do cliente do usuário autenticado
+        first_name = user.first_name
+        last_name = user.last_name
+        nome_cliente = f'{first_name} {last_name}' if first_name else 'Desconhecido'
+
+        cliente = Cliente.objects.get(user=user)
+        datas_uploads = get_unique_upload_dates(request)
 
         if request.method == 'POST':
-            selected_date = request.POST.get('selected_date')  # Captura a data selecionada
+            selected_date = request.POST.get('selected_date')  # Data selecionada no formulário
+
             if selected_date:
-                actions = ActionModel.objects.filter(upload_date=selected_date, nome=cliente.nome)
+                # Filtra as ações pelo cliente e data selecionada
+                actions = ActionModel.objects.filter(upload_date=selected_date, nome=nome_cliente)
 
                 # Gráfico de velocímetro
                 sim_count = actions.filter(acao='sim').count()
                 nao_count = actions.filter(acao='nao').count()
                 grafico_velocimetro = create_speedometer_chart(sim_count, nao_count)
 
-                # Calcula as porcentagens de IG e contagem de tipo de ativo
+                # Calcula porcentagens de IG e contagem de tipos de ativo
                 ig_percentages = calculate_ig_percentages(actions)
                 asset_type_counts = calculate_asset_type_counts(actions)
 
@@ -70,23 +74,33 @@ def index(request):
                 grafico_controle = create_control_chart(actions)
 
     except Cliente.DoesNotExist:
-        datas_uploads = []
+        # Caso o cliente não exista, as variáveis permanecerão vazias
+        pass
 
-    # Data com as ações, estará disponível sempre, mas os gráficos dependem da seleção da data
+    # Dados para a tabela principal
     data_with_actions = [
         {
-            'id': item.id, 'cis_control': item.cis_control, 'cis_sub_control': item.cis_sub_control,
-            'tipo_de_ativo': item.tipo_de_ativo, 'funcao_de_seguranca': item.funcao_de_seguranca,
-            'titulo': item.titulo, 'descricao': item.descricao, 'nist_csf': item.nist_csf,
-            'ig': item.ig, 'nome_da_subcategoria': item.nome_da_subcategoria, 'acao': ''
-        } for item in framework.objects.all()
+            'id': item.id,
+            'cis_control': item.cis_control,
+            'cis_sub_control': item.cis_sub_control,
+            'tipo_de_ativo': item.tipo_de_ativo,
+            'funcao_de_seguranca': item.funcao_de_seguranca,
+            'titulo': item.titulo,
+            'descricao': item.descricao,
+            'nist_csf': item.nist_csf,
+            'ig': item.ig,
+            'nome_da_subcategoria': item.nome_da_subcategoria,
+            'acao': ''
+        }
+        for item in framework.objects.all()
     ]
 
+    # Renderiza o template com o contexto
     return render(request, 'index.html', {
         'data': data_with_actions,
         'column_names': column_names,
         'datas_uploads': datas_uploads,
-        'selected_date': selected_date,  # Passa a data selecionada para o template
+        'selected_date': selected_date,
         'grafico_velocimetro': grafico_velocimetro,
         'grafico_controle': grafico_controle,
         'ig_percentages': ig_percentages,
@@ -100,17 +114,33 @@ def index(request):
 
 
 
-def get_unique_upload_dates(cliente):
+
+def get_unique_upload_dates(request):
     """Obtém datas de upload únicas associadas ao cliente no formato d/m/Y para exibição."""
+    
+    # Obtém o nome completo do cliente do usuário autenticado
+    user = request.user
+    first_name = 'Desconhecido'
+    last_name = ''
+    
+    if user.is_authenticated:
+        first_name = user.first_name
+        last_name = user.last_name
+    
+    # Nome do cliente no formato 'Primeiro Nome Sobrenome'
+    nome_cliente = f'{first_name} {last_name}' if first_name else 'Desconhecido'
+    
+    # Filtra as datas de upload únicas para o nome do cliente
     return [
         {
             'value': date.strftime('%Y-%m-%d'),       # Formato original para envio
             'display': date.strftime('%d/%m/%Y')      # Formato d/m/Y para exibição
         }
-        for date in ActionModel.objects.filter(nome=cliente.nome)
+        for date in ActionModel.objects.filter(nome=nome_cliente)
                                        .values_list('upload_date', flat=True)
                                        .distinct().order_by('upload_date')
     ]
+
 
 def create_speedometer_chart(sim_count, nao_count):
     """Cria o gráfico de velocímetro baseado na porcentagem de ações 'Sim'."""
@@ -333,70 +363,71 @@ def logout_view(request):
     django_logout(request)
     return redirect('login')
 
+
+
+
+
 def registro_view(request):
     if request.method == 'POST':
         form = ClienteForm(request.POST)
         if form.is_valid():
             try:
-                User = get_user_model()
-                user = User.objects.create_user(
-                    username=form.cleaned_data['email'],
-                    password=form.cleaned_data['senha']
-                )
+                cliente = form.save()
                 
-                cliente = form.save(commit=False)
-                cliente.user = user
-                cliente.save()
-
-                # Definir o backend explicitamente e fazer login
-                backend = 'django.contrib.auth.backends.ModelBackend'
-                user.backend = backend
-                login(request, user, backend=backend)
-
+                # Autentica o usuário utilizando o backend padrão
+                user = cliente.user
+                backend = 'django.contrib.auth.backends.ModelBackend'  # Caminho do backend como string
+                auth_login(request, user, backend=backend)  # Passa o backend explicitamente
+                
                 request.session['cliente_id'] = cliente.id
-                logger.info('Cliente salvo com sucesso!')
-                return redirect('index')  # Redireciona para a página de sucesso após o registro
+                return redirect('index')  # Redireciona para a página inicial
             except IntegrityError:
-                form.add_error(None, "Erro de integridade: possivelmente o e-mail já está em uso.")
-                logger.error("Erro de integridade ao salvar cliente.")
-        else:
-            logger.error('Formulário inválido: %s', form.errors)
+                form.add_error(None, "Erro: O email ou CNPJ já está registrado.")
     else:
         form = ClienteForm()
-
     return render(request, 'register.html', {'form': form})
+
 
 def login_view(request):
     if request.method == 'POST':
-        email = request.POST.get('email')
-        password = request.POST.get('password')
+        form = LoginForm(request.POST)
+        
+        # Verifica se o formulário é válido
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            password = form.cleaned_data['password']
 
-        try:
-            # Obtém o cliente pelo email
-            cliente = Cliente.objects.get(email=email)
-            # Verifica a senha
-            if check_password(password, cliente.senha):
-                # Autentica o usuário
-                user = authenticate(username=email, password=password)
-                if user is not None:
-                    auth_login(request, user)
-                    request.session['cliente_id'] = cliente.id
+            # Tenta autenticar o usuário com o email e senha
+            user = authenticate(request, username=email, password=password)
 
-                    # Registra o login
-                    Login.objects.create(
-                        cliente=cliente,
-                        descricao='Realizou Login'
-                    )
+            if user is not None:
+                # Se a autenticação for bem-sucedida, realiza o login
+                auth_login(request, user)
 
-                    return redirect('index')
-                else:
-                    messages.error(request, 'Email ou senha incorretos')
+                # Armazena o cliente associado ao usuário na sessão
+                request.session['cliente_id'] = user.cliente.id
+
+                # Registra o login do cliente
+                Login.objects.create(
+                    cliente=user.cliente,  # Associa o cliente ao login
+                    descricao='Realizou Login'
+                )
+
+                return redirect('index')  # Página inicial após o login
             else:
-                messages.error(request, 'Email ou senha incorretos')
-        except Cliente.DoesNotExist:
-            messages.error(request, 'Email ou senha incorretos')
-    
-    return render(request, 'login.html')
+                # Se a autenticação falhar, adiciona a mensagem de erro específica
+                messages.error(request, 'Email ou senha incorretos.')
+        else:
+            # Se o formulário não for válido, exibe apenas a mensagem de erro de autenticação
+            messages.error(request, 'Email ou senha incorretos.')
+
+    else:
+        form = LoginForm()
+
+    return render(request, 'login.html', {'form': form})
+
+
+
 
 
 
@@ -410,22 +441,39 @@ def upload_excel(request):
         if not excel_file:
             messages.error(request, 'Nenhum arquivo selecionado.')
             return redirect('index')
-        
-        fs = FileSystemStorage()
-        filename = fs.save(excel_file.name, excel_file)
-        uploaded_file_url = fs.url(filename)
-        
+
+        # Caminho para a pasta 'FrameWork' dentro da pasta 'media'
+        framework_directory = os.path.join(settings.MEDIA_ROOT, 'FrameWork')
+
+        # Verificar se a pasta 'FrameWork' existe, caso contrário, criá-la
+        if not os.path.exists(framework_directory):
+            os.makedirs(framework_directory)
+
+        # Remover qualquer arquivo existente dentro da pasta 'FrameWork'
+        for f in os.listdir(framework_directory):
+            file_path = os.path.join(framework_directory, f)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+
+        # Definir o caminho final para salvar o arquivo
+        filename = os.path.join(framework_directory, excel_file.name)
+
+        # Salvar o arquivo Excel na pasta 'FrameWork'
+        with open(filename, 'wb') as f:
+            for chunk in excel_file.chunks():
+                f.write(chunk)
+
+        # Ler o arquivo Excel
         try:
-            # Ler o arquivo Excel
-            df = pd.read_excel(fs.path(filename))
+            df = pd.read_excel(filename)
 
             # Substituir NaN por strings vazias
             df.fillna('', inplace=True)
 
-            # Excluir dados antigos
+            # Excluir dados antigos no banco de dados (se necessário)
             framework.objects.all().delete()
 
-            # Mapear colunas do DataFrame para campos do modelo
+            # Mapear as colunas do DataFrame para campos do modelo
             column_mapping = {
                 'CIS Control': 'cis_control',
                 'CIS Sub-Control': 'cis_sub_control',
@@ -456,38 +504,34 @@ def upload_excel(request):
                     nist_csf=row['NIST CSF'],
                     ig=row['IG'], # Adicione IG aqui
                     nome_da_subcategoria=row['Nome da subcategoria'],
-                    
                 )
-            
-            # Excluir o arquivo após o upload
-            os.remove(fs.path(filename))
+
+            # Mensagem de sucesso
             messages.success(request, 'Arquivo enviado com sucesso!')
         
         except Exception as e:
-            messages.error(request, f'Ocorreu um erro: {str(e)}')
+            messages.error(request, f'Ocorreu um erro ao processar o arquivo: {str(e)}')
             return redirect('index')
-        
+
         return redirect('index')
     
     return redirect('index')
-
 
 
 def update_table(request):
     if request.method == 'POST':
         try:
             today = timezone.now().date()
-            #today = "2024-11-10"
             user = request.user
-            nome_cliente = 'Desconhecido'
+            first_name = 'Desconhecido'
+            last_name = ''
 
             if user.is_authenticated:
-                email = user.username
-                try:
-                    cliente = Cliente.objects.get(email=email)
-                    nome_cliente = cliente.nome
-                except Cliente.DoesNotExist:
-                    pass
+                first_name = user.first_name
+                last_name = user.last_name
+
+            # Verifica se o cliente existe
+            nome_cliente = f'{first_name} {last_name}' if first_name else 'Desconhecido'
 
             if request.POST.get('save') == 'temporary':
                 item_id = request.POST.get('editId')
@@ -561,7 +605,7 @@ def update_table(request):
                 df.fillna('', inplace=True)
 
                 filename = f"{nome_cliente}_{today}.xlsx"
-                file_path = f"media/{filename}"
+                file_path = f"{filename}"
 
                 # Verificar se o arquivo já existe e, se sim, removê-lo
                 if default_storage.exists(file_path):
@@ -684,12 +728,19 @@ def load_temporary_table(request):
     # Verifica se o usuário está autenticado
     if request.user.is_authenticated:
         try:
-            # Obtém o email do usuário logado
-            email = request.user.username
-            # Encontra o cliente com base no email
-            cliente = Cliente.objects.get(email=email)
-            # Recupera os registros temporários para este cliente
-            temp_records = TemporaryActionModel.objects.filter(nome=cliente.nome)
+            user = request.user
+            first_name = 'Desconhecido'
+            last_name = ''
+
+            # Obtém o nome completo do cliente
+            if user.is_authenticated:
+                first_name = user.first_name
+                last_name = user.last_name
+
+            # Nome do cliente no formato 'Primeiro Nome Sobrenome'
+            nome_cliente = f'{first_name} {last_name}' if first_name else 'Desconhecido'
+
+            temp_records = TemporaryActionModel.objects.filter(nome=nome_cliente)
 
             # Verifica se existem registros temporários
             if not temp_records.exists():
@@ -701,7 +752,7 @@ def load_temporary_table(request):
 
             # Define os nomes das colunas manualmente
             column_names = [
-                'CIS Control', 'CIS Sub-Control', 'Tipo de ativo',
+                'Control', 'Sub-Control', 'Ativo',
                 'Função de segurança', 'Título', 'Descrição',
                 'NIST CSF','IG','Nome da subcategoria'
             ]

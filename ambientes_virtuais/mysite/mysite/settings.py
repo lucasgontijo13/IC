@@ -105,7 +105,8 @@ SOCIALACCOUNT_PROVIDERS = {
         }
     }
 }
-
+SOCIALACCOUNT_ADAPTER = 'polls.adapters.MySocialAccountAdapter'
+SOCIALACCOUNT_LOGIN_ON_GET = True
 LOGIN_REDIRECT_URL = '/index'
 
 

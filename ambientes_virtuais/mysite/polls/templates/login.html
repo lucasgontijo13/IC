@@ -111,11 +111,27 @@
                                         <div class="form-floating mb-3">
                                             <input class="form-control" id="inputEmail" name="email" type="email" placeholder="name@example.com" required />
                                             <label for="inputEmail">Endereço de email</label>
+                                            {% if form.email.errors %}
+                                                <div class="alert alert-danger">
+                                                    {% for error in form.email.errors %}
+                                                        <p>{{ error }}</p>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
                                         </div>
+                                    
                                         <div class="form-floating mb-3">
                                             <input class="form-control" id="inputPassword" name="password" type="password" placeholder="Password" required />
                                             <label for="inputPassword">Senha</label>
+                                            {% if form.password.errors %}
+                                                <div class="alert alert-danger">
+                                                    {% for error in form.password.errors %}
+                                                        <p>{{ error }}</p>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
                                         </div>
+                                    
                                         {% if messages %}
                                             <div class="alert alert-danger">
                                                 {% for message in messages %}
@@ -123,6 +139,7 @@
                                                 {% endfor %}
                                             </div>
                                         {% endif %}
+                                    
                                         <div class="form-check mb-3">
                                             <input class="form-check-input" id="inputRememberPassword" name="remember" type="checkbox" />
                                             <label class="form-check-label" for="inputRememberPassword">Lembrar Senha</label>
@@ -134,7 +151,7 @@
                                     </form>
                                     
                                     <div class="d-flex justify-content-center">
-                                        <a href="{% provider_login_url 'google' %}?prompt=login">
+                                        <a href="{% provider_login_url 'google' %}">
                                             <button class="gsi-material-button">
                                                 <div class="gsi-material-button-state"></div>
                                                 <div class="gsi-material-button-content-wrapper">

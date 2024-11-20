@@ -1,5 +1,30 @@
 from django.db import models
 from django.utils import timezone
+from django.db import models
+from django.utils import timezone
+from django.contrib.auth.models import User
+
+
+
+class Cliente(models.Model):
+    cnpj = models.CharField(max_length=14, unique=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True) 
+
+    def __str__(self):
+        return self.user.username if self.user else 'Usuário não associado'  # Retorna o nome de usuário ou uma mensagem padrão
+
+    # Propriedades para acessar o nome e o email diretamente do User
+    @property
+    def nome(self):
+        return self.user.first_name if self.user else 'Nome não disponível'  # Verifica se 'user' existe
+
+    @property
+    def email(self):
+        return self.user.email if self.user else 'Email não disponível'  # Verifica se 'user' existe
+
+
+
+
 
 class Question(models.Model):
     question_text = models.CharField(max_length=200)
@@ -10,29 +35,11 @@ class Choice(models.Model):
     choice_text = models.CharField(max_length=200)
     votes = models.IntegerField(default=0)
 
-class Cliente(models.Model):
-    id = models.AutoField(primary_key=True)
-    nome = models.CharField(max_length=50)
-    email = models.EmailField(max_length=50, unique=True, null=False, default='default@example.com')
-    cnpj = models.CharField(max_length=14, unique=True, default='00000000000000')
-    senha = models.CharField(max_length=128, null=True)  # Limitar senha para 8 caracteres
-    data_cadastro = models.DateTimeField(blank=True, null=True)  # Adicionando o campo last_login
-    is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False)
-    
 
-    def __str__(self):
-        return self.nome 
-    
-    def has_perm(self, perm, obj=None):
-        return True
-
-    def has_module_perms(self, app_label):
-        return True
 
 
 class Login(models.Model):
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)  # Relacionamento com Cliente
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, null=False)  # Garante que sempre tenha um cliente
     data_time = models.DateTimeField(default=timezone.now)  # Adiciona a data e hora de criação
     descricao = models.CharField(max_length=45, default='Entrou')
 
