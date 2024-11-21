@@ -3,7 +3,6 @@ from django.shortcuts import render, redirect
 from .forms import ClienteForm, LoginForm
 from django.db import IntegrityError
 from django.contrib import messages
-from django.core.files.storage import FileSystemStorage
 import pandas as pd
 from .models import Cliente, Login , framework, ActionModel
 from django.contrib.auth import logout as django_logout
@@ -56,7 +55,7 @@ def index(request):
         nome_cliente = f'{first_name} {last_name}' if first_name else 'Desconhecido'
 
         cliente = Cliente.objects.get(user=user)
-        datas_uploads = get_unique_upload_dates(request)
+        datas_uploads = data_consulta_grafico(request)
 
         if request.method == 'POST':
             selected_date = request.POST.get('selected_date')  # Data selecionada no formulário
@@ -68,14 +67,14 @@ def index(request):
                 # Gráfico de velocímetro
                 sim_count = actions.filter(acao='sim').count()
                 nao_count = actions.filter(acao='nao').count()
-                grafico_velocimetro = create_speedometer_chart(sim_count, nao_count)
+                grafico_velocimetro = cria_grafico_velocimetro(sim_count, nao_count)
 
                 # Calcula porcentagens de IG e contagem de tipos de ativo
-                ig_percentages = calculate_ig_percentages(actions)
-                asset_type_counts = calculate_asset_type_counts(actions)
+                ig_percentages = calcula_porcentagem_ig(actions)
+                asset_type_counts = calcula_ativos_grafico(actions)
 
                 # Gráfico de linha por controle
-                grafico_controle = create_control_chart(actions)
+                grafico_controle = cria_grafico_controle(actions)
 
     except Cliente.DoesNotExist:
         # Caso o cliente não exista, as variáveis permanecerão vazias
@@ -112,238 +111,11 @@ def index(request):
     })
 
 
-
-
-
-
-
-
-
-def get_unique_upload_dates(request):
-    """Obtém datas de upload únicas associadas ao cliente no formato d/m/Y para exibição."""
-    
-    # Obtém o nome completo do cliente do usuário autenticado
-    user = request.user
-    first_name = 'Desconhecido'
-    last_name = ''
-    
-    if user.is_authenticated:
-        first_name = user.first_name
-        last_name = user.last_name
-    
-    # Nome do cliente no formato 'Primeiro Nome Sobrenome'
-    nome_cliente = f'{first_name} {last_name}' if first_name else 'Desconhecido'
-    
-    # Filtra as datas de upload únicas para o nome do cliente
-    return [
-        {
-            'value': date.strftime('%Y-%m-%d'),       # Formato original para envio
-            'display': date.strftime('%d/%m/%Y')      # Formato d/m/Y para exibição
-        }
-        for date in ActionModel.objects.filter(nome=nome_cliente)
-                                       .values_list('upload_date', flat=True)
-                                       .distinct().order_by('upload_date')
-    ]
-
-
-def create_speedometer_chart(sim_count, nao_count):
-    """Cria o gráfico de velocímetro baseado na porcentagem de ações 'Sim'."""
-    total_actions = sim_count + nao_count
-    percentage = (sim_count / total_actions) * 100 if total_actions > 0 else 0
-    fig_velocimetro = go.Figure(go.Indicator(
-        mode="gauge+number", value=percentage,
-        title={'text': "Velocímetro", 'font': {'size': 16}},
-        number={'font': {'size': 28, 'color': 'blue'}},
-        gauge={
-            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "black"},
-            'bar': {'color': "darkblue", 'thickness': 0.2},
-            'bgcolor': "white", 'borderwidth': 1, 'bordercolor': "gray",
-            'steps': [
-                {'range': [0, 50], 'color': "LightBlue"},
-                {'range': [50, 100], 'color': "RoyalBlue"}
-            ],
-            'threshold': {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 90}
-        }
-    ))
-    fig_velocimetro.update_layout(
-        title_text="Percentual de Ações 'Sim'", titlefont_size=16,
-        margin=dict(l=35, r=35, t=30, b=10), font=dict(color='black', size=12)
-    )
-    return fig_velocimetro.to_html(full_html=False)
-
-def calculate_ig_percentages(actions):
-    """Calcula a porcentagem de 'Sim' para cada valor distinto de IG, ignorando 'None' e 'Não se aplica'."""
-    ig_percentages = {}
-
-    # Obtém os valores distintos de IG, excluindo os valores None
-    ig_values = actions.values_list('ig', flat=True).exclude(ig=None).distinct()
-
-    for ig in ig_values:
-        # Contagem de "Sim" para o IG atual
-        ig_sim_count = actions.filter(ig=ig, acao='sim').count()
-
-        # Total de ações para o IG atual, excluindo "Não se aplica"
-        ig_total = actions.filter(ig=ig).exclude(acao='nao se aplica').count()
-
-        # Calcula a porcentagem de "Sim" para o IG atual
-        ig_percentage = (ig_sim_count / ig_total) * 100 if ig_total > 0 else 0
-        ig_percentages[ig] = round(ig_percentage, 2)
-
-    return ig_percentages
-
-
-def calculate_asset_type_counts(actions):
-    """Calcula a contagem de 'Sim' e o total para cada tipo de ativo."""
-    asset_type_counts = {}
-
-    # Obtém os tipos de ativo distintos
-    asset_types = actions.values_list('tipo_de_ativo', flat=True).distinct()
-
-    for tipo in asset_types:
-        # Conta quantos registros têm 'Sim' e o total, ignorando 'Não se aplica'
-        tipo_sim_count = actions.filter(tipo_de_ativo=tipo, acao='sim').count()
-        tipo_total = actions.filter(tipo_de_ativo=tipo).exclude(acao='nao se aplica').count()
-        
-        asset_type_counts[tipo] = {
-            'sim_count': tipo_sim_count,
-            'total': tipo_total
-        }
-
-    return asset_type_counts
-
-
-
-def create_control_chart(actions):
-    controls = list(range(1, 21))
-    control_titles = [
-        "   Inventário e Controle de<br>   Ativos de Hardware", "   Inventário e Controle de<br>   Ativos de Software",
-        "   Gerenciamento contínuo<br>   de vulnerabilidades", "   Uso controlado de<br>   privilégios administrativos",
-        "   Configuração segura para hardware<br>   e software em dispositivos móveis,<br>   laptops,estações de trabalho e servidores",
-        "   Manutenção, Monitoramento e Análise de <br>   registros de Auditoria", "   Proteção de e-mail e<br>   navegador da Web",
-        "   Defesas contra malware", "   Limitação e Controle de Portas,<br>   Protocolos e<br>   Serviços de Rede",
-        "   Capacidades de<br>   recuperação de dados", "   Configuração Segura para Rede Dispositivos,<br>   como Firewalls, Roteadores e Switches",
-        "   Defesa de Limites", "   Proteção de Dados", "   Acesso controlado com<br>   base na necessidade de saber",
-        "   Controle de acesso<br>   sem fio", "   Monitoramento e Controle<br>   de Contas",
-        "   Implementar um programa de<br>   treinamento e conscientização<br>   de segurança", "   Segurança de Software<br>   de Aplicação",
-        "   Resposta e Gerenciamento<br>   de Incidentes", "   Testes de Penetração<br>   e Exercícios de Equipe Vermelha"
-    ]
-
-    # Calcula a meta para cada controle como (total de campos - campos "não se aplica")
-    metas = []
-    sim_counts = []
-    for control in controls:
-        total_campos = actions.filter(cis_control=control).count()
-        nao_se_aplica = actions.filter(cis_control=control, acao='não se aplica').count()
-        meta = total_campos - nao_se_aplica
-        metas.append(meta)
-        
-        # Conta o número de "Sim" para cada controle
-        sim_count = actions.filter(cis_control=control, acao='sim').count()
-        sim_counts.append(sim_count)
-
-    # Cria o gráfico de barras
-    fig = go.Figure()
-
-    # Adiciona as barras com os valores "Sim"
-    fig.add_trace(go.Bar(
-        x=control_titles,
-        y=sim_counts,
-        text=sim_counts,
-        textposition='inside',
-        insidetextanchor='start',  # Centraliza o texto na parte inferior da barra
-        name='Aderência',
-        marker=dict(color="rgb(0, 51, 102)", line=dict(color="rgb(0, 51, 102)", width=2)),
-        textfont=dict(size=14, color="white")  # Aumenta a fonte e coloca a cor do texto como branca para melhor contraste
-    ))
-
-    # Adiciona a linha de meta para cada controle
-    fig.add_trace(go.Scatter(
-        x=control_titles,
-        y=metas,
-        mode='lines',
-        name='Meta',
-        line=dict(color='rgb(78, 177, 210)', width=2)  # Linha contínua em azul claro, sem marcadores
-    ))
-
-    # Adiciona os valores das metas acima da linha, com um pequeno deslocamento ajustando o valor de y
-    fig.add_trace(go.Scatter(
-        x=control_titles,
-        y=[meta + 0.5 for meta in metas],  # Adiciona 2 de deslocamento aos valores das metas
-        mode='text',
-        text=metas,
-        textposition='top center',
-        showlegend=False,  # Não exibe esta entrada na legenda
-        textfont=dict(size=12, color="black")
-    ))
-
-    # Configurações do layout
-    fig.update_layout(
-        title={
-            'text': "Aderência do CIS Controls por Categoria vs Meta",
-            'x': 0.5,  # Centraliza o título
-            'xanchor': 'center',
-            'font': {'size': 20}  # Aumenta o tamanho da fonte do título
-        },
-        #xaxis_title="Controle",
-        #yaxis_title="Número de 'Sim'",
-        yaxis=dict(range=[0, max(max(sim_counts), max(metas)) + 5]),  # Ajusta o limite do eixo y
-        showlegend=True,
-        barmode='group',
-        bargap=0.5,  # Aumenta o espaçamento entre as barras
-        template="plotly_white",
-        width=1100,  # Aumenta a largura do gráfico
-        height=800   # Aumenta a altura do gráfico
-    )
-
-    # Ajusta a rotação, o alinhamento e o espaçamento dos títulos no eixo X
-    fig.update_xaxes(
-        tickangle=90,  # Rotaciona os rótulos
-        tickfont=dict(size=14),  # Aumenta a fonte dos rótulos do eixo x
-        tickvals=control_titles,
-        ticktext=control_titles,
-        titlefont=dict(size=16),  # Aumenta o título do eixo x
-        title_standoff=50,  # Ajusta o espaçamento do título do eixo X em relação aos rótulos
-        
-    )
-
-    # Ajusta as margens para garantir que os rótulos não fiquem grudados
-    fig.update_layout(margin=dict(l=50, r=40, t=80, b=150))  # Aumenta a margem inferior
-
-    return fig.to_html(full_html=False)
-
-
-
-
-
-
-
-
-def error_401(request):
-    return render(request, '401.html')
-
-def error_404(request, exception):
-    return render(request, '404.html')
-
-def error_500(request):
-    return render(request, '500.html')
-
-def charts(request):
-    return render(request, 'charts.html')
-
-def layout_sidenav_light(request):
-    return render(request, 'layout-sidenav-light.html')
-
-def layout_static(request):
-    return render(request, 'layout-static.html')
-
 def password(request):
     return render(request, 'password.html')
 
 def register(request):
     return render(request, 'register.html')
-
-def tables(request):
-    return render(request, 'tables.html')
 
 
 def logout_view(request):
@@ -361,9 +133,6 @@ def logout_view(request):
     
     django_logout(request)
     return redirect('login')
-
-
-
 
 
 def registro_view(request):
@@ -425,6 +194,201 @@ def login_view(request):
 
     return render(request, 'login.html', {'form': form})
 
+
+
+
+def data_consulta_grafico(request):
+    """Obtém datas de upload únicas associadas ao cliente no formato d/m/Y para exibição."""
+    
+    # Obtém o nome completo do cliente do usuário autenticado
+    user = request.user
+    first_name = 'Desconhecido'
+    last_name = ''
+    
+    if user.is_authenticated:
+        first_name = user.first_name
+        last_name = user.last_name
+    
+    # Nome do cliente no formato 'Primeiro Nome Sobrenome'
+    nome_cliente = f'{first_name} {last_name}' if first_name else 'Desconhecido'
+    
+    # Filtra as datas de upload únicas para o nome do cliente
+    return [
+        {
+            'value': date.strftime('%Y-%m-%d'),       # Formato original para envio
+            'display': date.strftime('%d/%m/%Y')      # Formato d/m/Y para exibição
+        }
+        for date in ActionModel.objects.filter(nome=nome_cliente)
+                                       .values_list('upload_date', flat=True)
+                                       .distinct().order_by('upload_date')
+    ]
+
+
+def cria_grafico_velocimetro(sim_count, nao_count):
+    """Cria o gráfico de velocímetro baseado na porcentagem de ações 'Sim'."""
+    total_actions = sim_count + nao_count
+    percentage = (sim_count / total_actions) * 100 if total_actions > 0 else 0
+    fig_velocimetro = go.Figure(go.Indicator(
+        mode="gauge+number", value=percentage,
+        title={'text': "Velocímetro", 'font': {'size': 16}},
+        number={'font': {'size': 28, 'color': 'blue'}},
+        gauge={
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "black"},
+            'bar': {'color': "darkblue", 'thickness': 0.2},
+            'bgcolor': "white", 'borderwidth': 1, 'bordercolor': "gray",
+            'steps': [
+                {'range': [0, 50], 'color': "LightBlue"},
+                {'range': [50, 100], 'color': "RoyalBlue"}
+            ],
+            'threshold': {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 90}
+        }
+    ))
+    fig_velocimetro.update_layout(
+        title_text="Percentual de Ações 'Sim'", titlefont_size=16,
+        margin=dict(l=35, r=35, t=30, b=10), font=dict(color='black', size=12)
+    )
+    return fig_velocimetro.to_html(full_html=False)
+
+
+def calcula_porcentagem_ig(actions):
+    """Calcula a porcentagem de 'Sim' para cada valor distinto de IG, ignorando 'None' e 'Não se aplica'."""
+    ig_percentages = {}
+
+    # Obtém os valores distintos de IG, excluindo os valores None
+    ig_values = actions.values_list('ig', flat=True).exclude(ig=None).distinct()
+
+    for ig in ig_values:
+        # Contagem de "Sim" para o IG atual
+        ig_sim_count = actions.filter(ig=ig, acao='sim').count()
+
+        # Total de ações para o IG atual, excluindo "Não se aplica"
+        ig_total = actions.filter(ig=ig).exclude(acao='nao se aplica').count()
+
+        # Calcula a porcentagem de "Sim" para o IG atual
+        ig_percentage = (ig_sim_count / ig_total) * 100 if ig_total > 0 else 0
+        ig_percentages[ig] = round(ig_percentage, 2)
+
+    return ig_percentages
+
+
+def calcula_ativos_grafico(actions):
+    """Calcula a contagem de 'Sim' e o total para cada tipo de ativo."""
+    asset_type_counts = {}
+
+    # Obtém os tipos de ativo distintos
+    asset_types = actions.values_list('tipo_de_ativo', flat=True).distinct()
+
+    for tipo in asset_types:
+        # Conta quantos registros têm 'Sim' e o total, ignorando 'Não se aplica'
+        tipo_sim_count = actions.filter(tipo_de_ativo=tipo, acao='sim').count()
+        tipo_total = actions.filter(tipo_de_ativo=tipo).exclude(acao='nao se aplica').count()
+        
+        asset_type_counts[tipo] = {
+            'sim_count': tipo_sim_count,
+            'total': tipo_total
+        }
+
+    return asset_type_counts
+
+
+
+def cria_grafico_controle(actions):
+    controls = list(range(1, 21))
+    control_titles = [
+        "   Inventário e Controle de<br>   Ativos de Hardware", "   Inventário e Controle de<br>   Ativos de Software",
+        "   Gerenciamento contínuo<br>   de vulnerabilidades", "   Uso controlado de<br>   privilégios administrativos",
+        "   Configuração segura para hardware<br>   e software em dispositivos móveis,<br>   laptops,estações de trabalho e servidores",
+        "   Manutenção, Monitoramento e Análise de <br>   registros de Auditoria", "   Proteção de e-mail e<br>   navegador da Web",
+        "   Defesas contra malware", "   Limitação e Controle de Portas,<br>   Protocolos e<br>   Serviços de Rede",
+        "   Capacidades de<br>   recuperação de dados", "   Configuração Segura para Rede Dispositivos,<br>   como Firewalls, Roteadores e Switches",
+        "   Defesa de Limites", "   Proteção de Dados", "   Acesso controlado com<br>   base na necessidade de saber",
+        "   Controle de acesso<br>   sem fio", "   Monitoramento e Controle<br>   de Contas",
+        "   Implementar um programa de<br>   treinamento e conscientização<br>   de segurança", "   Segurança de Software<br>   de Aplicação",
+        "   Resposta e Gerenciamento<br>   de Incidentes", "   Testes de Penetração<br>   e Exercícios de Equipe Vermelha"
+    ]
+
+    # Calcula a meta para cada controle como (total de campos - campos "não se aplica")
+    metas = []
+    sim_counts = []
+    for control in controls:
+        total_campos = actions.filter(cis_control=control).count()
+        nao_se_aplica = actions.filter(cis_control=control, acao='não se aplica').count()
+        meta = total_campos - nao_se_aplica
+        metas.append(meta)
+        
+        # Conta o número de "Sim" para cada controle
+        sim_count = actions.filter(cis_control=control, acao='sim').count()
+        sim_counts.append(sim_count)
+
+    # Cria o gráfico de barras
+    fig = go.Figure()
+
+    # Adiciona as barras com os valores "Sim"
+    fig.add_trace(go.Bar(
+        x=control_titles,
+        y=sim_counts,
+        text=sim_counts,
+        textposition='inside',
+        insidetextanchor='start',  
+        name='Aderência',
+        marker=dict(color="rgb(0, 51, 102)", line=dict(color="rgb(0, 51, 102)", width=2)),
+        textfont=dict(size=14, color="white")  
+    ))
+
+    # Adiciona a linha de meta para cada controle
+    fig.add_trace(go.Scatter(
+        x=control_titles,
+        y=metas,
+        mode='lines',
+        name='Meta',
+        line=dict(color='rgb(78, 177, 210)', width=2)  
+    ))
+
+    # Adiciona os valores das metas acima da linha, com um pequeno deslocamento ajustando o valor de y
+    fig.add_trace(go.Scatter(
+        x=control_titles,
+        y=[meta + 0.5 for meta in metas],  # Adiciona 2 de deslocamento aos valores das metas
+        mode='text',
+        text=metas,
+        textposition='top center',
+        showlegend=False,  
+        textfont=dict(size=12, color="black")
+    ))
+
+    # Configurações do layout
+    fig.update_layout(
+        title={
+            'text': "Aderência do CIS Controls por Categoria vs Meta",
+            'x': 0.5,  # Centraliza o título
+            'xanchor': 'center',
+            'font': {'size': 20}  
+        },
+        #xaxis_title="Controle",
+        #yaxis_title="Número de 'Sim'",
+        yaxis=dict(range=[0, max(max(sim_counts), max(metas)) + 5]),  # Ajusta o limite do eixo y
+        showlegend=True,
+        barmode='group',
+        bargap=0.5,  # Aumenta o espaçamento entre as barras
+        template="plotly_white",
+        width=1100,  # Aumenta a largura do gráfico
+        height=800   # Aumenta a altura do gráfico
+    )
+
+    # Ajusta a rotação, o alinhamento e o espaçamento dos títulos no eixo X
+    fig.update_xaxes(
+        tickangle=90,  
+        tickfont=dict(size=14),  
+        tickvals=control_titles,
+        ticktext=control_titles,
+        titlefont=dict(size=16),  
+        title_standoff=50,  
+        
+    )
+
+    # Ajusta as margens para garantir que os rótulos não fiquem grudados
+    fig.update_layout(margin=dict(l=50, r=40, t=80, b=150))  # Aumenta a margem inferior
+
+    return fig.to_html(full_html=False)
 
 
 
@@ -517,7 +481,7 @@ def upload_excel(request):
     return redirect('index')
 
 
-def update_table(request):
+def atualiza_tabela(request):
     if request.method == 'POST':
         try:
             today = timezone.now().date()
@@ -598,8 +562,7 @@ def update_table(request):
                         'acao': action
                     })
 
-                print(f"{saved_count} itens salvos no ActionModel.")
-
+                
                 df = pd.DataFrame(data_for_excel)
                 df.fillna('', inplace=True)
 
@@ -647,7 +610,7 @@ def update_table(request):
     else:
         return redirect('index')
 
-def download_actionModel(request):
+def baixar_tabela(request):
     # Recebe parâmetros da requisição
     user_name = request.GET.get('user_name')
     submission_date_str = request.GET.get('submission_date')
@@ -723,7 +686,7 @@ def download_actionModel(request):
 
     return response
 
-def load_temporary_table(request):
+def carrega_tabela_temporaria(request):
     # Verifica se o usuário está autenticado
     if request.user.is_authenticated:
         try:
@@ -775,18 +738,15 @@ def load_temporary_table(request):
                     'nome_da_subcategoria': item.nome_da_subcategoria,
                     'acao': temp_actions.get(item.titulo, ''),  # Adiciona a ação correspondente
                 })
+            messages.success(request, 'Tabela carregada com sucesso!')
 
             return render(request, 'index.html', {
                 'data': data_with_actions,  # Passa os dados com ações
                 'column_names': column_names,
             })
+        
         except Cliente.DoesNotExist:
             messages.error(request, 'Cliente não encontrado.')
             return redirect('login')
     else:
         return redirect('login')
-    
-
-
-
-
