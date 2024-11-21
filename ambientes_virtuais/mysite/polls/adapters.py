@@ -1,6 +1,7 @@
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+from django.shortcuts import redirect
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied
+from allauth.exceptions import ImmediateHttpResponse
 
 class MySocialAccountAdapter(DefaultSocialAccountAdapter):
     def pre_social_login(self, request, sociallogin):
@@ -13,4 +14,8 @@ class MySocialAccountAdapter(DefaultSocialAccountAdapter):
                 sociallogin.connect(request, user)  # Vincula o login social ao usuário existente
             except User.DoesNotExist:
                 # Bloqueia o login caso o email não esteja cadastrado
-                raise PermissionDenied("O login com o Google é permitido apenas para usuários já cadastrados.")
+                raise ImmediateHttpResponse(redirect('register'))
+            
+
+
+

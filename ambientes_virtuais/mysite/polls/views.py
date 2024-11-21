@@ -28,6 +28,10 @@ logger = logging.getLogger('django')
 logger = logging.getLogger(__name__)
 
 
+
+
+
+
 @login_required(login_url='login')
 def index(request):
     column_names = [
@@ -306,11 +310,6 @@ def create_control_chart(actions):
     fig.update_layout(margin=dict(l=50, r=40, t=80, b=150))  # Aumenta a margem inferior
 
     return fig.to_html(full_html=False)
-
-
-
-
-
 
 
 

@@ -78,9 +78,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-
     'allauth.account.middleware.AccountMiddleware', 
 ]
+
+
+
 
 SITE_ID = 5
 
@@ -88,6 +90,9 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
+
+
+
 
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
@@ -105,10 +110,25 @@ SOCIALACCOUNT_PROVIDERS = {
         }
     }
 }
+
+
+
+
+
+
 SOCIALACCOUNT_ADAPTER = 'polls.adapters.MySocialAccountAdapter'
+
 SOCIALACCOUNT_LOGIN_ON_GET = True
 LOGIN_REDIRECT_URL = '/index'
 
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # Servidor SMTP do Gmail
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'paisagens2527@gmail.com'  # Seu email
+EMAIL_HOST_PASSWORD = 'trmz ukui ksfw znww'  # Substitua pela senha correta ou pelo App Password
+DEFAULT_FROM_EMAIL = 'paisagens2527@gmail.com'  # Endereço de remetente
 
 ROOT_URLCONF = 'mysite.urls'
 
