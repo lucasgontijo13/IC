@@ -9,7 +9,7 @@
     <link href="{% static 'css/styles.css' %}" rel="stylesheet" />
     <script src="https://use.fontawesome.com/releases/v6.3.0/js/all.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-primary">
+<body class="bg-light">
     <div id="layoutAuthentication">
         <div id="layoutAuthentication_content">
             <main>
@@ -23,6 +23,9 @@
                                 <div class="card-body">
                                     <form method="post" action="{% url 'password_reset_confirm' uidb64=uid token=token %}">
                                         {% csrf_token %}
+                                        <input type="hidden" name="uidb64" value="{{ uid }}">
+                                        <input type="hidden" name="token" value="{{ token }}">
+                                    
                                         <div class="form-floating mb-3">
                                             <input class="form-control" id="inputNewPassword" name="password" type="password" placeholder="Nova Senha" required />
                                             <label for="inputNewPassword">Nova Senha</label>
@@ -31,11 +34,15 @@
                                             <input class="form-control" id="inputConfirmPassword" name="confirm_password" type="password" placeholder="Confirme a Nova Senha" required />
                                             <label for="inputConfirmPassword">Confirme a Nova Senha</label>
                                         </div>
+                                        {% for message in messages %}
+                                            <p class="alert alert-danger">{{ message }}</p>
+                                        {% endfor %}
                                         <div class="d-flex align-items-center justify-content-between mt-4 mb-0">
                                             <a class="small" href="{% url 'login' %}">Voltar para login</a>
                                             <button class="btn btn-primary" type="submit">Redefinir Senha</button>
                                         </div>
                                     </form>
+                                    
                                 </div>
                             </div>
                         </div>

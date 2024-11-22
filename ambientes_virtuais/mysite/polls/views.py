@@ -20,14 +20,72 @@ from django.core.files.base import ContentFile
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.contrib.auth import login as auth_login
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.auth.models import User
+from django.utils.http import urlsafe_base64_decode
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.views import PasswordResetView
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 
 logger = logging.getLogger('django')
-
-
 logger = logging.getLogger(__name__)
 
 
 
+def custom_password_reset_confirm(request, uidb64, token):
+    try:
+        # Decodificando o ID do usuário a partir do token
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    # Se o método for POST, processa a alteração de senha
+    if request.method == "POST":
+        password = request.POST.get("password")
+        confirm_password = request.POST.get("confirm_password")
+
+        # Verificando se as senhas coincidem
+        if password != confirm_password:
+            messages.error(request, "As senhas não coincidem.")
+            return render(request, 'registration/solicitando_nova_senha.html', {'uid': uidb64, 'token': token})
+
+        # Verificando se o token é válido
+        if user and default_token_generator.check_token(user, token):
+            user.set_password(password)
+            user.save()
+            update_session_auth_hash(request, user)  # Mantém o usuário autenticado após a troca de senha
+            return redirect('confirmacao_senha_alterada')
+        else:
+            messages.error(request, "O link para redefinir a senha é inválido ou expirou.")
+
+    # Retorna o formulário de redefinição de senha se não for POST ou se houver erro
+    return render(request, 'registration/solicitando_nova_senha.html', {'uid': uidb64, 'token': token})
+
+
+
+
+class CustomPasswordResetView(PasswordResetView):
+    def form_valid(self, form):
+        email = form.cleaned_data['email']
+
+        # Validação do formato do e-mail
+        try:
+            validate_email(email)
+        except ValidationError:
+            form.add_error('email', "E-mail inválido. Verifique e tente novamente.")
+            return self.form_invalid(form)
+
+        # Verifica se o e-mail existe exatamente no banco de dados
+        if not User.objects.filter(email=email).exists():
+            form.add_error('email', "O e-mail fornecido não está cadastrado no sistema.")
+            return self.form_invalid(form)
+
+        # Marca a sessão como válida para acesso às páginas subsequentes
+        self.request.session['password_reset_allowed'] = True
+
+        return super().form_valid(form)
 
 
 
