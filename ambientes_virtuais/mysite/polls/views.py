@@ -4,14 +4,14 @@ from .forms import ClienteForm, LoginForm
 from django.db import IntegrityError
 from django.contrib import messages
 import pandas as pd
-from .models import Cliente, Login , framework, ActionModel
+from .models import Cliente,framework, ActionModel
 from django.contrib.auth import logout as django_logout
 from django.utils import timezone
 from django.contrib.auth import authenticate, login as auth_login
 import openpyxl
 from django.http import HttpResponse
 from datetime import datetime
-from .models import TemporaryActionModel
+from .models import TemporaryActionModel,Log
 import plotly.graph_objs as go
 import plotly.graph_objects as go
 from io import BytesIO
@@ -27,66 +27,10 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.views import PasswordResetView
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from openpyxl import Workbook
 
 logger = logging.getLogger('django')
 logger = logging.getLogger(__name__)
-
-
-
-def custom_password_reset_confirm(request, uidb64, token):
-    try:
-        # Decodificando o ID do usuário a partir do token
-        uid = urlsafe_base64_decode(uidb64).decode()
-        user = User.objects.get(pk=uid)
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-        user = None
-
-    # Se o método for POST, processa a alteração de senha
-    if request.method == "POST":
-        password = request.POST.get("password")
-        confirm_password = request.POST.get("confirm_password")
-
-        # Verificando se as senhas coincidem
-        if password != confirm_password:
-            messages.error(request, "As senhas não coincidem.")
-            return render(request, 'registration/solicitando_nova_senha.html', {'uid': uidb64, 'token': token})
-
-        # Verificando se o token é válido
-        if user and default_token_generator.check_token(user, token):
-            user.set_password(password)
-            user.save()
-            update_session_auth_hash(request, user)  # Mantém o usuário autenticado após a troca de senha
-            return redirect('confirmacao_senha_alterada')
-        else:
-            messages.error(request, "O link para redefinir a senha é inválido ou expirou.")
-
-    # Retorna o formulário de redefinição de senha se não for POST ou se houver erro
-    return render(request, 'registration/solicitando_nova_senha.html', {'uid': uidb64, 'token': token})
-
-
-
-
-class CustomPasswordResetView(PasswordResetView):
-    def form_valid(self, form):
-        email = form.cleaned_data['email']
-
-        # Validação do formato do e-mail
-        try:
-            validate_email(email)
-        except ValidationError:
-            form.add_error('email', "E-mail inválido. Verifique e tente novamente.")
-            return self.form_invalid(form)
-
-        # Verifica se o e-mail existe exatamente no banco de dados
-        if not User.objects.filter(email=email).exists():
-            form.add_error('email', "O e-mail fornecido não está cadastrado no sistema.")
-            return self.form_invalid(form)
-
-        # Marca a sessão como válida para acesso às páginas subsequentes
-        self.request.session['password_reset_allowed'] = True
-
-        return super().form_valid(form)
-
 
 
 @login_required(login_url='login')
@@ -99,7 +43,7 @@ def index(request):
     # Inicialização das variáveis
     grafico_velocimetro = None
     grafico_controle = None
-    ig_percentages = {}
+    ig_data = {}  # Para conter as porcentagens e metas
     asset_type_counts = {}
     datas_uploads = []
     selected_date = None
@@ -112,7 +56,7 @@ def index(request):
         last_name = user.last_name
         nome_cliente = f'{first_name} {last_name}' if first_name else 'Desconhecido'
 
-        cliente = Cliente.objects.get(user=user)
+       
         datas_uploads = data_consulta_grafico(request)
 
         if request.method == 'POST':
@@ -127,12 +71,20 @@ def index(request):
                 nao_count = actions.filter(acao='nao').count()
                 grafico_velocimetro = cria_grafico_velocimetro(sim_count, nao_count)
 
-                # Calcula porcentagens de IG e contagem de tipos de ativo
-                ig_percentages = calcula_porcentagem_ig(actions)
+                # Calcula porcentagens e metas para cada IG
+                ig_data = calcula_porcentagem_ig(actions)
+
+                # Calcula contagem de tipos de ativo
                 asset_type_counts = calcula_ativos_grafico(actions)
 
                 # Gráfico de linha por controle
                 grafico_controle = cria_grafico_controle(actions)
+
+                # Adiciona o log informando que o cliente gerou os gráficos
+                Log.objects.create(
+                    cliente=user,
+                    descricao=f'O cliente {user.first_name} {user.last_name} gerou gráficos para a data {selected_date}.'
+                )
 
     except Cliente.DoesNotExist:
         # Caso o cliente não exista, as variáveis permanecerão vazias
@@ -156,7 +108,7 @@ def index(request):
         for item in framework.objects.all()
     ]
 
-    # Renderiza o template com o contexto
+    
     return render(request, 'index.html', {
         'data': data_with_actions,
         'column_names': column_names,
@@ -164,61 +116,51 @@ def index(request):
         'selected_date': selected_date,
         'grafico_velocimetro': grafico_velocimetro,
         'grafico_controle': grafico_controle,
-        'ig_percentages': ig_percentages,
+        'ig_data': ig_data,
         'asset_type_counts': asset_type_counts,
     })
 
 
-def password(request):
-    return render(request, 'password.html')
 
-def register(request):
-    return render(request, 'register.html')
 
 
 def logout_view(request):
+    # Obter o cliente associado ao logout
     cliente_id = request.session.get('cliente_id')
+
+
     if cliente_id:
         try:
             cliente = Cliente.objects.get(id=cliente_id)
-            # Registrar o logout
-            Login.objects.create(
-                cliente=cliente,
-                descricao='Realizou Logout'
-            )
+            user = cliente.user  # Obter o usuário associado ao cliente
+
+            if user:
+                # Registrar o logout no modelo Log
+                Log.objects.create(
+                    cliente=user,
+                    descricao=f'O cliente {user.first_name} {user.last_name} realizou logout.'
+                )
+                
+            else:
+                logger.warning(f'O cliente com ID {cliente_id} não possui um usuário associado.')
         except Cliente.DoesNotExist:
             logger.error(f'Cliente com ID {cliente_id} não encontrado.')
-    
-    django_logout(request)
-    return redirect('login')
-
-
-def registro_view(request):
-    if request.method == 'POST':
-        form = ClienteForm(request.POST)
-        if form.is_valid():
-            try:
-                cliente = form.save()
-                
-                # Autentica o usuário utilizando o backend padrão
-                user = cliente.user
-                backend = 'django.contrib.auth.backends.ModelBackend'  # Caminho do backend como string
-                auth_login(request, user, backend=backend)  # Passa o backend explicitamente
-                
-                request.session['cliente_id'] = cliente.id
-                return redirect('index')  # Redireciona para a página inicial
-            except IntegrityError:
-                form.add_error(None, "Erro: O email ou CNPJ já está registrado.")
     else:
-        form = ClienteForm()
-    return render(request, 'register.html', {'form': form})
+        logger.warning(f"cliente_id não encontrado na sessão. O cliente pode não estar logado.")
+
+    # Encerrar a sessão do usuário
+    django_logout(request)
+
+    # Remover o cliente_id da sessão
+    request.session.pop('cliente_id', None)
+
+    return redirect('login')
 
 
 def login_view(request):
     if request.method == 'POST':
         form = LoginForm(request.POST)
         
-        # Verifica se o formulário é válido
         if form.is_valid():
             email = form.cleaned_data['email']
             password = form.cleaned_data['password']
@@ -227,30 +169,146 @@ def login_view(request):
             user = authenticate(request, username=email, password=password)
 
             if user is not None:
-                # Se a autenticação for bem-sucedida, realiza o login
+                # Realiza o login
                 auth_login(request, user)
 
                 # Armazena o cliente associado ao usuário na sessão
-                request.session['cliente_id'] = user.cliente.id
+                try:
+                    cliente = Cliente.objects.get(user=user)
+                    request.session['cliente_id'] = cliente.id
 
-                # Registra o login do cliente
-                Login.objects.create(
-                    cliente=user.cliente,  # Associa o cliente ao login
-                    descricao='Realizou Login'
-                )
+                    # Registra o login do cliente na tabela de logs
+                    Log.objects.create(
+                        cliente=user,
+                        descricao=f'O cliente {user.first_name} {user.last_name} realizou login.'
+                    )
+
+
+                except Cliente.DoesNotExist:
+                    messages.error(request, "Erro: Cliente associado ao usuário não encontrado.")
+                    logger.error(f"Cliente associado ao usuário {user.username} não encontrado.")
+                    return redirect('login')
 
                 return redirect('index')  # Página inicial após o login
             else:
-                # Se a autenticação falhar, adiciona a mensagem de erro específica
                 messages.error(request, 'Email ou senha incorretos.')
+                logger.warning(f"Tentativa de login falhou para o email: {email}")
         else:
-            # Se o formulário não for válido, exibe apenas a mensagem de erro de autenticação
-            messages.error(request, 'Email ou senha incorretos.')
-
+            messages.error(request, 'Formulário inválido. Verifique os dados informados.')
+            logger.warning("Formulário de login inválido enviado.")
     else:
         form = LoginForm()
 
     return render(request, 'login.html', {'form': form})
+
+
+def registro_view(request):
+    if request.method == 'POST':
+        form = ClienteForm(request.POST)
+        if form.is_valid():
+            try:
+                cliente = form.save()  # Salva o cliente no banco de dados
+                
+                # Autentica o usuário utilizando o backend padrão
+                user = cliente.user
+                backend = 'django.contrib.auth.backends.ModelBackend'  # Caminho do backend como string
+                auth_login(request, user, backend=backend)  # Passa o backend explicitamente
+                
+                # Armazena o cliente na sessão
+                request.session['cliente_id'] = cliente.id
+
+                # Registra o evento de criação na tabela de logs
+                Log.objects.create(
+                    cliente=user,
+                    descricao=f'O cliente {user.first_name} {user.last_name} realizou registro.'
+                )
+
+
+                return redirect('index')  # Redireciona para a página inicial
+            except IntegrityError:
+                form.add_error(None, "Erro: O email ou CNPJ já está registrado.")
+                logger.warning("Tentativa de registro falhou: email ou CNPJ já está registrado.")
+    else:
+        form = ClienteForm()
+
+    return render(request, 'register.html', {'form': form})
+
+
+def custom_password_reset_confirm(request, uidb64, token):
+    try:
+        # Decodificando o ID do usuário a partir do token
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    # Se o método for POST, processa a alteração de senha
+    if request.method == "POST":
+        password = request.POST.get("password")
+        confirm_password = request.POST.get("confirm_password")
+
+        # Verificando se as senhas coincidem
+        if password != confirm_password:
+            messages.error(request, "As senhas não coincidem.")
+            # Log de erro ao tentar redefinir senha com senhas não coincidentes
+            if user:
+                Log.objects.create(
+                    cliente=user,
+                    descricao=f"Tentativa de redefinir senha com senhas não coincidentes para {user.first_name} {user.last_name}."
+                )
+            return render(request, 'registration/solicitando_nova_senha.html', {'uid': uidb64, 'token': token})
+
+        # Verificando se o token é válido
+        if user and default_token_generator.check_token(user, token):
+            user.set_password(password)
+            user.save()
+            update_session_auth_hash(request, user)  # Mantém o usuário autenticado após a troca de senha
+            # Log de sucesso ao alterar a senha
+            Log.objects.create(
+                cliente=user,
+                descricao=f"A senha foi alterada com sucesso para {user.first_name} {user.last_name}."
+            )
+            return redirect('confirmacao_senha_alterada')
+        else:
+            messages.error(request, "O link para redefinir a senha é inválido ou expirou.")
+            # Log de erro quando o token for inválido
+            if user:
+                Log.objects.create(
+                    cliente=user,
+                    descricao=f"Tentativa de redefinir senha falhou para {user.first_name} {user.last_name} devido a um token inválido ou expirado."
+                )
+
+    # Retorna o formulário de redefinição de senha se não for POST ou se houver erro
+    return render(request, 'registration/solicitando_nova_senha.html', {'uid': uidb64, 'token': token})
+
+
+class CustomPasswordResetView(PasswordResetView):
+    def form_valid(self, form):
+        email = form.cleaned_data['email']
+
+        # Validação do formato do e-mail
+        try:
+            validate_email(email)
+        except ValidationError:
+            form.add_error('email', "E-mail inválido. Verifique e tente novamente.")
+            return self.form_invalid(form)
+
+        # Verifica se o e-mail existe exatamente no banco de dados
+        if not User.objects.filter(email=email).exists():
+            form.add_error('email', "O e-mail fornecido não está cadastrado no sistema.")
+            return self.form_invalid(form)
+
+        # Marca a sessão como válida para acesso às páginas subsequentes
+        self.request.session['password_reset_allowed'] = True
+        # Log de sucesso ao tentar redefinir senha
+        user = User.objects.get(email=email)
+        Log.objects.create(
+            cliente=user,
+            descricao=f"Solicitação de redefinição de senha para {user.first_name} {user.last_name} com e-mail {email}."
+        )
+
+        return super().form_valid(form)
+
 
 
 
@@ -309,24 +367,33 @@ def cria_grafico_velocimetro(sim_count, nao_count):
 
 
 def calcula_porcentagem_ig(actions):
-    """Calcula a porcentagem de 'Sim' para cada valor distinto de IG, ignorando 'None' e 'Não se aplica'."""
-    ig_percentages = {}
+    ig_data = {}
 
-    # Obtém os valores distintos de IG, excluindo os valores None
-    ig_values = actions.values_list('ig', flat=True).exclude(ig=None).distinct()
+    # Obtém os valores distintos de IG, excluindo os valores None, e ordena
+    ig_values = actions.values_list('ig', flat=True).exclude(ig=None).distinct().order_by('ig')
 
     for ig in ig_values:
+        # Total de ações para o IG atual (inclui "Não se aplica")
+        ig_total = actions.filter(ig=ig).count()
+
         # Contagem de "Sim" para o IG atual
         ig_sim_count = actions.filter(ig=ig, acao='sim').count()
 
-        # Total de ações para o IG atual, excluindo "Não se aplica"
-        ig_total = actions.filter(ig=ig).exclude(acao='nao se aplica').count()
-
         # Calcula a porcentagem de "Sim" para o IG atual
         ig_percentage = (ig_sim_count / ig_total) * 100 if ig_total > 0 else 0
-        ig_percentages[ig] = round(ig_percentage, 2)
 
-    return ig_percentages
+        # Total de ações válidas para a meta (exclui "Não se aplica")
+        ig_total_valid = actions.filter(ig=ig).exclude(acao='nao se aplica').count()
+
+        # Calcula a meta para o IG atual
+        ig_meta = (ig_total_valid / ig_total) * 100 if ig_total > 0 else 0
+
+        ig_data[ig] = {
+            "percentage": round(ig_percentage, 2),
+            "meta": round(ig_meta, 2),
+        }
+
+    return ig_data
 
 
 def calcula_ativos_grafico(actions):
@@ -347,7 +414,6 @@ def calcula_ativos_grafico(actions):
         }
 
     return asset_type_counts
-
 
 
 def cria_grafico_controle(actions):
@@ -453,6 +519,9 @@ def cria_grafico_controle(actions):
 
 
 def upload_excel(request):
+    # Verificar se o cliente_id está na sessão
+    cliente_id = request.session.get('cliente_id')
+
     if request.method == 'POST':
         if 'file' not in request.FILES:
             messages.error(request, 'Nenhum arquivo selecionado.')
@@ -529,7 +598,24 @@ def upload_excel(request):
 
             # Mensagem de sucesso
             messages.success(request, 'Arquivo enviado com sucesso!')
-        
+
+            # Registrar o evento de upload no modelo Log
+            cliente_id = request.session.get('cliente_id')
+            if cliente_id:
+                try:
+                    cliente = Cliente.objects.get(id=cliente_id)
+                    user = cliente.user  # Obter o usuário associado ao cliente
+                    Log.objects.create(
+                        cliente=user,
+                        descricao=f'O cliente {user.first_name} {user.last_name} fez upload de um FrameWork.'
+                    )
+                except Cliente.DoesNotExist:
+                    messages.error(request, "Erro: Cliente associado ao usuário não encontrado.")
+                    return redirect('index')
+            else:
+                messages.error(request, "Erro: Cliente não encontrado na sessão.")
+                return redirect('index')
+
         except Exception as e:
             messages.error(request, f'Ocorreu um erro ao processar o arquivo: {str(e)}')
             return redirect('index')
@@ -554,6 +640,7 @@ def atualiza_tabela(request):
             # Verifica se o cliente existe
             nome_cliente = f'{first_name} {last_name}' if first_name else 'Desconhecido'
 
+            # Logar a atualização de linha
             if request.POST.get('save') == 'temporary':
                 item_id = request.POST.get('editId')
                 new_action = request.POST.get(f'action_{item_id}')
@@ -582,6 +669,13 @@ def atualiza_tabela(request):
                         }
                     )
                     messages.success(request, 'Ação da linha salva temporariamente.')
+
+                    # Log para atualização de linha
+                    Log.objects.create(
+                        cliente=user,
+                        descricao=f'O cliente {user.first_name} {user.last_name} atualizou a linha da sua tabela {framework_item.titulo}.'
+                    )
+
                 else:
                     messages.error(request, 'Nenhuma linha foi selecionada para atualizar.')
 
@@ -620,24 +714,28 @@ def atualiza_tabela(request):
                         'acao': action
                     })
 
-                
+                # Gerar e salvar o arquivo Excel
                 df = pd.DataFrame(data_for_excel)
                 df.fillna('', inplace=True)
 
                 filename = f"{nome_cliente}_{today}.xlsx"
                 file_path = f"{filename}"
 
-                # Verificar se o arquivo já existe e, se sim, removê-lo
                 if default_storage.exists(file_path):
                     default_storage.delete(file_path)
 
-                # Criar o arquivo Excel e salvar
                 excel_file = BytesIO()
                 df.to_excel(excel_file, index=False)
                 excel_file.seek(0)
                 default_storage.save(file_path, ContentFile(excel_file.read()))
 
                 messages.success(request, 'Tabela enviada com sucesso!')
+
+                # Log para envio da tabela
+                Log.objects.create(
+                    cliente=user,
+                    descricao=f'O cliente {user.first_name} {user.last_name} enviou a sua tabela.'
+                )
 
             else:
                 TemporaryActionModel.objects.filter(nome=nome_cliente).delete()
@@ -661,12 +759,19 @@ def atualiza_tabela(request):
 
                 messages.success(request, 'Tabela salva temporariamente com sucesso!')
 
+                # Log para salvar tabela temporariamente
+                Log.objects.create(
+                    cliente=user,
+                    descricao=f'O cliente {user.first_name} {user.last_name} salvou a sua tabela.'
+                )
+
         except Exception as e:
             messages.error(request, f'Ocorreu um erro ao atualizar a tabela: {str(e)}')
 
         return redirect('index')
     else:
         return redirect('index')
+
 
 def baixar_tabela(request):
     # Recebe parâmetros da requisição
@@ -675,13 +780,17 @@ def baixar_tabela(request):
 
     # Verifica se os parâmetros foram fornecidos
     if not user_name or not submission_date_str:
-        return HttpResponse("Nome do usuário ou data não fornecidos.", status=400)
+        logger.error(f"Nome do usuário ou data não fornecidos. user_name: {user_name}, submission_date: {submission_date_str}")
+        messages.error(request, "Nome do usuário ou data não fornecidos.")
+        return redirect('index')
 
     # Converte a string de data do formato YYYY-MM-DD para um objeto de data
     try:
         submission_date = datetime.strptime(submission_date_str, '%Y-%m-%d').date()
     except ValueError:
-        return HttpResponse("Data no formato inválido. Use o formato YYYY-MM-DD.", status=400)
+        logger.error(f"Data no formato inválido fornecida. Data recebida: {submission_date_str}")
+        messages.error(request, "Data no formato inválido. Use o formato YYYY-MM-DD.")
+        return redirect('index')
 
     # Busca os registros que correspondem ao nome e data fornecidos
     registros = ActionModel.objects.filter(
@@ -690,12 +799,14 @@ def baixar_tabela(request):
     )
 
     if not registros.exists():
-        return HttpResponse("Nenhum registro encontrado para os critérios fornecidos.", status=404)
+        logger.warning(f"Nenhum registro encontrado para o usuário {user_name} na data {submission_date}.")
+        messages.error(request, f"Nenhum registro encontrado para o usuário {user_name} na data {submission_date}.")
+        return redirect('index')
 
     # Cria um novo workbook e sheet
-    wb = openpyxl.Workbook()
+    wb = Workbook()
     ws = wb.active
-    
+
     # Garantir que o nome da planilha não tenha mais de 31 caracteres
     sheet_title = f"Planilha de {user_name}"
     ws.title = sheet_title[:31]  # Truncar o título para 31 caracteres
@@ -734,15 +845,23 @@ def baixar_tabela(request):
     # Criar a resposta HTTP com o arquivo gerado
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename={user_name}_{submission_date}.xlsx'
-
+    nome_tabela = f"{user_name}_{submission_date}.xlsx"
     # Tente forçar a gravação no response
     try:
         wb.save(response)
+        # Log para o sucesso do download da tabela
+        Log.objects.create(
+            cliente=request.user,
+            descricao=f'O cliente {request.user.first_name} {request.user.last_name} baixou a tabela {nome_tabela}.'
+        )
+        
     except Exception as e:
-        print(f"Erro ao salvar o arquivo Excel: {str(e)}")
-        return HttpResponse("Erro ao gerar o arquivo Excel.", status=500)
+        logger.error(f"Erro ao salvar o arquivo Excel: {str(e)}")
+        messages.error(request, "Erro ao gerar o arquivo Excel.")
+        return redirect('index')
 
     return response
+
 
 def carrega_tabela_temporaria(request):
     # Verifica se o usuário está autenticado
@@ -797,6 +916,12 @@ def carrega_tabela_temporaria(request):
                     'acao': temp_actions.get(item.titulo, ''),  # Adiciona a ação correspondente
                 })
             messages.success(request, 'Tabela carregada com sucesso!')
+
+            # Log para o carregamento da tabela temporária
+            Log.objects.create(
+                cliente=request.user,
+                descricao=f'O cliente {request.user.first_name} {request.user.last_name} carregou sua tabela.'
+            )
 
             return render(request, 'index.html', {
                 'data': data_with_actions,  # Passa os dados com ações

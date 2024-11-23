@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from .models import Cliente, Login
+from .models import Cliente
 from django.core.exceptions import ValidationError
 from django.contrib.auth import authenticate
 

@@ -6,91 +6,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <meta name="description" content="" />
     <meta name="author" content="" />
-    <title>Register - SB Admin</title>
+    <title>Registro</title>
     {% load static %}
     <link href="{% static 'css/styles.css' %}" rel="stylesheet" />
     <script src="https://use.fontawesome.com/releases/v6.3.0/js/all.js" crossorigin="anonymous"></script>
 </head>
 <body class="sb-nav-fixed">
-    <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
-        <!-- Navbar Brand-->
-        <a class="navbar-brand ps-3" href="#">Start Bootstrap</a>
-        <!-- Sidebar Toggle-->
-        <button class="btn btn-link btn-sm order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle" href="#!"><i class="fas fa-bars"></i></button>
-        <!-- Navbar-->
-        <ul class="navbar-nav ms-auto ms-md-0 me-3 me-lg-4">
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" id="navbarDropdown" href="#" role="button" data-bs-toggle="" aria-expanded="false"><i class="fas fa-user fa-fw"></i></a>
-                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                    <li><a class="dropdown-item" href="#!">Configurações</a></li>
-                    <li><a class="dropdown-item" href="#!">Registro de Atividades</a></li>
-                    <li><hr class="dropdown-divider" /></li>
-                    <li><a class="dropdown-item" href="#!">Sair</a></li>
-                </ul>
-            </li>
-        </ul>
-    </nav>
+    <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark"></nav>
+
     <div id="layoutSidenav">
         <div id="layoutSidenav_nav">
             <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
                 <div class="sb-sidenav-menu">
                     <div class="nav">
                         <div class="sb-sidenav-menu-heading">Principal</div>
-                        <a class="nav-link" href="#">
-                            <div class="sb-nav-link-icon"><i class="fas fa-tachometer-alt"></i></div>
-                            Painel de Controle
-                        </a>
-                        <div class="sb-sidenav-menu-heading">Interface</div>
-                        <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="" aria-expanded="false" aria-controls="collapseLayouts">
-                            <div class="sb-nav-link-icon"><i class="fas fa-columns"></i></div>
-                            Layouts
-                            <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-                        </a>
-                        <div class="collapse" id="collapseLayouts" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordion">
-                            <nav class="sb-sidenav-menu-nested nav">
-                                <a class="nav-link" href="#">Navegação Estática</a>
-                                <a class="nav-link" href="#">Sidenav Claro</a>
-                            </nav>
-                        </div>
-                        <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="" aria-expanded="false" aria-controls="collapsePages">
-                            <div class="sb-nav-link-icon"><i class="fas fa-book-open"></i></div>
-                            Páginas
-                            <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-                        </a>
-                        <div class="collapse" id="collapsePages" aria-labelledby="headingTwo" data-bs-parent="#sidenavAccordion">
-                            <nav class="sb-sidenav-menu-nested nav accordion" id="sidenavAccordionPages">
-                                <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#pagesCollapseAuth" aria-expanded="false" aria-controls="pagesCollapseAuth">
-                                    Autenticação
-                                    <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-                                </a>
-                                <div class="collapse" id="pagesCollapseAuth" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordionPages">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="#">Entrar</a>
-                                        <a class="nav-link" href="#">Cadastro</a>
-                                        <a class="nav-link" href="#">Esqueceu sua senha</a>
-                                    </nav>
-                                </div>
-                                <a class="nav-link collapsed" href="#" data-bs-toggle="collapse" data-bs-target="#pagesCollapseError" aria-expanded="false" aria-controls="pagesCollapseError">
-                                    Erro
-                                    <div class="sb-sidenav-collapse-arrow"><i class="fas fa-angle-down"></i></div>
-                                </a>
-                                <div class="collapse" id="pagesCollapseError" aria-labelledby="headingOne" data-bs-parent="#sidenavAccordionPages">
-                                    <nav class="sb-sidenav-menu-nested nav">
-                                        <a class="nav-link" href="#">Página 401</a>
-                                        <a class="nav-link" href="#">Página 404</a>
-                                        <a class="nav-link" href="#">Página 500</a>
-                                    </nav>
-                                </div>
-                            </nav>
-                        </div>
-                        <div class="sb-sidenav-menu-heading">Complementos</div>
-                        <a class="nav-link" href="#">
+                        
+                        <!-- Gráficos -->
+                        <a class="nav-link">
                             <div class="sb-nav-link-icon"><i class="fas fa-chart-area"></i></div>
                             Gráficos
                         </a>
-                        <a class="nav-link" href="#">
+                        
+                        <!-- Tabelas -->
+                        <a class="nav-link">
                             <div class="sb-nav-link-icon"><i class="fas fa-table"></i></div>
                             Tabelas
+                        </a>
+                    
+                        <div class="sb-sidenav-menu-heading">Autenticação</div>
+                        
+                        <!-- Login -->
+                        <a class="nav-link" href="{% url 'login' %}">
+                            <div class="sb-nav-link-icon"><i class="fas fa-sign-in-alt"></i></div>
+                            Login
+                        </a>
+                        
+                        <!-- Registro -->
+                        <a class="nav-link" href="{% url 'register' %}">
+                            <div class="sb-nav-link-icon"><i class="fas fa-user-plus"></i></div>
+                            Registro
+                        </a>
+                        
+                        <!-- Recuperar Senha -->
+                        <a class="nav-link" href="#">
+                            <div class="sb-nav-link-icon"><i class="fas fa-key"></i></div>
+                            Recuperar Senha
                         </a>
                     </div>
                 </div>
@@ -198,6 +158,15 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div>
+                                            {% if messages %}
+                                                <div class="alert alert-danger">
+                                                    {% for message in messages %}
+                                                        <p>{{ message }}</p>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </div>
                                         <div class="mt-4 mb-0">
                                             <div class="d-grid">
                                                 <button type="submit" class="btn btn-primary btn-block">Criar uma conta</button>
@@ -218,11 +187,11 @@
             <footer class="py-4 bg-light mt-auto">
                 <div class="container-fluid px-4">
                     <div class="d-flex align-items-center justify-content-between small">
-                        <div class="text-muted">Direito Autoral &copy; Your Website 2023</div>
+                        <div class="text-muted"></div>
                         <div>
-                            <a href="#">Política de Privacidade</a>
+                            <a href="#"></a>
                             &middot;
-                            <a href="#">Termos &amp; Condições</a>
+                            <a href="#"></a>
                         </div>
                     </div>
                 </div>

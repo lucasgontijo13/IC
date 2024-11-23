@@ -4,6 +4,8 @@ from .views import baixar_tabela
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
 
+
+    
 urlpatterns = [
     path('register/', views.registro_view, name='register'),  
     path('', views.login_view, name='login'),
@@ -28,12 +30,14 @@ urlpatterns = [
     path('reset/<uidb64>/<token>/',views.custom_password_reset_confirm,
         name='password_reset_confirm'),
 
-        
-    path('reset/done/',auth_views.PasswordResetCompleteView.as_view(template_name='registration/confirmacao_senha_alterada.html'),
-         name='password_reset_complete'),
+    #CREIO QUE NAO PRECISA DISSO
+    # path('reset/done/',auth_views.PasswordResetCompleteView.as_view(template_name='registration/confirmacao_senha_alterada.html'),
+    #      name='password_reset_complete'),
 
     path(
         'confirmacao-senha-alterada/',auth_views.PasswordResetCompleteView.as_view(template_name='registration/confirmacao_senha_alterada.html'),
         name='confirmacao_senha_alterada'),
+    
+    
     
 ]

@@ -38,13 +38,7 @@ class Choice(models.Model):
 
 
 
-class Login(models.Model):
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, null=False)  # Garante que sempre tenha um cliente
-    data_time = models.DateTimeField(default=timezone.now)  # Adiciona a data e hora de criação
-    descricao = models.CharField(max_length=45, default='Entrou')
 
-    def __str__(self):
-        return f'{self.cliente.nome} - {self.descricao}'
     
     
 
@@ -99,3 +93,23 @@ class TemporaryActionModel(models.Model):
 
     def __str__(self):
         return self.titulo
+    
+
+class Log(models.Model):
+    # ID gerado automaticamente pelo Django
+    id = models.AutoField(primary_key=True)
+    
+    # Cliente associado ao log (relacionamento com o modelo User)
+    cliente = models.ForeignKey(User, on_delete=models.CASCADE, related_name='logs')  # Relacionamento com o User
+    
+    # Data e hora do log
+    data_time = models.DateTimeField(auto_now_add=True)
+    
+    # Descrição do log
+    descricao = models.TextField()
+
+    def __str__(self):
+        return f"Log {self.id} - {self.descricao[:30]}"
+
+    class Meta:
+        db_table = 'polls_log'
