@@ -29,10 +29,7 @@ class MySocialAccountAdapter(DefaultSocialAccountAdapter):
                 # Bloqueia o login caso o email não esteja cadastrado
                 messages.error(request, "Essa conta Google não está cadastrada. Por favor, registre-se.")
                 raise ImmediateHttpResponse(redirect('register'))
-        else:
-            # Se o fluxo for interrompido (ex: clicar em cancelar), redirecionar para login
-            messages.warning(request, "Login cancelado. Por favor, tente novamente.")
-            raise ImmediateHttpResponse(redirect('/login'))
+        
 
 
 

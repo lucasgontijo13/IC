@@ -37,7 +37,5 @@ urlpatterns = [
     path(
         'confirmacao-senha-alterada/',auth_views.PasswordResetCompleteView.as_view(template_name='registration/confirmacao_senha_alterada.html'),
         name='confirmacao_senha_alterada'),
-    
-    
-    
+   
 ]

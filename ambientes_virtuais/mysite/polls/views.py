@@ -28,9 +28,12 @@ from django.contrib.auth.views import PasswordResetView
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from openpyxl import Workbook
+from django.views import View
 
 logger = logging.getLogger('django')
 logger = logging.getLogger(__name__)
+
+
 
 
 @login_required(login_url='login')
@@ -361,7 +364,8 @@ def cria_grafico_velocimetro(sim_count, nao_count):
     ))
     fig_velocimetro.update_layout(
         title_text="Percentual de Ações 'Sim'", titlefont_size=16,
-        margin=dict(l=35, r=35, t=30, b=10), font=dict(color='black', size=12)
+        margin=dict(l=35, r=35, t=30, b=10), font=dict(color='black', size=12),
+        
     )
     return fig_velocimetro.to_html(full_html=False)
 

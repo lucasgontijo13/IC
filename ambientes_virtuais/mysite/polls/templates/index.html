@@ -72,7 +72,7 @@
                             </a>
                             
                             <!-- Recuperar Senha -->
-                            <a class="nav-link" href="#">
+                            <a class="nav-link" href="{% url 'recuperarSenha' %}">
                                 <div class="sb-nav-link-icon"><i class="fas fa-key"></i></div>
                                 Recuperar Senha
                             </a>
@@ -168,7 +168,7 @@
                                                 <i class="fas fa-database me-1"></i>
                                                 Adesão por Tipos de Ativo
                                             </div>
-                                            <div class="card-body d-flex justify-content-center">
+                                            <div class="card-body d-flex justify-content-center custom-ativo">
                                                 <!-- Sidebar para os tipos de ativo -->
                                                 <div class="asset-types-container custom-asset-types-container">
                                                     {% for tipo, counts in asset_type_counts.items %}
@@ -219,8 +219,8 @@
                                             <div class="card-header">
                                                 <i class="fas fa-chart-pie me-1"></i>
                                                 Gráfico de Velocimetro
-                                            </div>
-                                            <div class="card-body d-flex">
+                                            </div> 
+                                            <div class="card-body d-flex card-body-custom">
                                                 <div class="ig_div1">
                                                     {% if grafico_velocimetro %}
                                                         {{ grafico_velocimetro|safe }}
