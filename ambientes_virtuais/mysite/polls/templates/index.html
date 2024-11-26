@@ -168,31 +168,33 @@
                                                 <i class="fas fa-database me-1"></i>
                                                 Adesão por Tipos de Ativo
                                             </div>
-                                            <div class="card-body d-flex justify-content-center custom-ativo">
-                                                <!-- Sidebar para os tipos de ativo -->
+                                            <div class="card-body">
+                                                <!-- Container principal do gráfico -->
                                                 <div class="asset-types-container custom-asset-types-container">
-                                                    {% for tipo, counts in asset_type_counts.items %}
-                                                        <div class="asset-card custom-asset-card">
-                                                            <!-- Ícone correspondente ao tipo de ativo -->
-                                                            <i class="{% if tipo == '' or tipo == None %}fas fa-arrows-alt
-                                                            {% elif tipo|lower == 'formulários' %}fas fa-laptop-code
-                                                            {% elif tipo|lower == 'dados' %}fas fa-database
-                                                            {% elif tipo|lower == 'dispositivos' %}fas fa-mobile-alt
-                                                            {% elif tipo|lower == 'usuários' %}fas fa-user
-                                                            {% elif tipo|lower == 'rede' %}fas fa-globe
-                                                            {% else %}fas fa-question{% endif %} icon-size"></i>
-                                                                                                                                                                    
-                                                            <!-- Exibe "N/A" caso o tipo esteja vazio -->
-                                                            <h5 class="mt-2">{{ tipo|default:"N/A" }}</h5>
-                                                            <p>{{ counts.sim_count }} / {{ counts.total }}</p>
-                                                            
-                                                        </div>
-                                                    {% endfor %}
+                                                    <div class="scroll-container">
+                                                        {% for tipo, counts in asset_type_counts.items %}
+                                                            <div class="asset-card custom-asset-card">
+                                                                <!-- Ícone correspondente ao tipo de ativo -->
+                                                                <i class="{% if tipo == '' or tipo == None %}fas fa-arrows-alt
+                                                                {% elif tipo|lower == 'formulários' %}fas fa-laptop-code
+                                                                {% elif tipo|lower == 'dados' %}fas fa-database
+                                                                {% elif tipo|lower == 'dispositivos' %}fas fa-mobile-alt
+                                                                {% elif tipo|lower == 'usuários' %}fas fa-user
+                                                                {% elif tipo|lower == 'rede' %}fas fa-globe
+                                                                {% else %}fas fa-question{% endif %} icon-size"></i>
+                                                
+                                                                <!-- Exibe "N/A" caso o tipo esteja vazio -->
+                                                                <h5 class="mt-2">{{ tipo|default:"N/A" }}</h5>
+                                                                <p>{{ counts.sim_count }} / {{ counts.total }}</p>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
                                                 </div>
+                                                
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                </div>                                
                                 <div class="row">
                                     <div class="col-xl-12">
                                         <div class="card mb-4">
@@ -203,9 +205,11 @@
                                             <div class="card-body">
                                                 <div class="chart-container">
                                                     {% if grafico_controle %}
-                                                        {{ grafico_controle|safe }}
+                                                        <div class="scroll-container">
+                                                            {{ grafico_controle|safe }}
+                                                        </div>
                                                     {% else %}
-                                                        <p></p>
+                                                        <p>Sem dados para exibir.</p>
                                                     {% endif %}
                                                 </div>
                                             </div>

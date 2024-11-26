@@ -11281,7 +11281,7 @@ body {
 }
 #datatablesSimple th, #datatablesSimple td {
   border: 1px solid #ddd;
-  padding: 8px;
+  padding: 4px;
   text-align: left;
 }
 #datatablesSimple th {
@@ -11625,14 +11625,25 @@ table th {
   gap: 15px !important;
 }
 
-.custom-asset-card {
-  flex: 1 1 16% !important;
+/* .custom-asset-card {
+  flex: 0 1 16% !important;
   min-width: 150px !important;
   max-width: 200px !important;
   text-align: center !important;
-  padding: 15px !important;
+  padding: 10px !important;
   border: 1px solid #ddd !important;
   border-radius: 5px !important;
+} */
+
+.custom-asset-card {
+  flex: 0 0 auto; /* Não permite que os cartões redimensionem */
+  width: 200px;
+  text-align: center;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 
@@ -11643,5 +11654,32 @@ table th {
   overflow-x: auto; /* Habilita a barra de rolagem horizontal */
   white-space: nowrap; 
 }
+
+
+.scroll-container {
+  display: flex;
+  overflow-x: auto;
+  white-space: nowrap;
+  gap: 1rem; /* Espaçamento entre os cartões */
+  padding: 0.5rem;
+}
+
+.scroll-container::-webkit-scrollbar {
+  height: 8px; /* Altura da barra de rolagem */
+}
+
+.scroll-container::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 4px;
+}
+
+.scroll-container::-webkit-scrollbar-thumb:hover {
+  background-color: #aaa;
+}
+
+
+
+
+
 
 
