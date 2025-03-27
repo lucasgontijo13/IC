@@ -1730,6 +1730,7 @@ table th {
   font-family: Arial, sans-serif;
   border-radius: 8px;
   width: 200px;
+  background-color: black;
 }
 
 .ig-box h3 {
@@ -1885,7 +1886,17 @@ table th {
 }
 
 
+.ig1 {
+  background-color: #008000; /* Verde */
+}
 
+.ig2 {
+  background-color: #ffa500; /* Laranja */
+}
+
+.ig3 {
+  background-color: #a0cad8; /* Azul */
+}
 
 
 

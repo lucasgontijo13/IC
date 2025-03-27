@@ -239,11 +239,15 @@
                                                     {% if ig_data %}
                                                         <div class="ig-container">
                                                             {% for ig, data in ig_data.items %}
-                                                                <div class="ig-box custom-ig-box {% if ig == 'IG1' %}ig1{% elif ig == 'IG2' %}ig2{% else %}default{% endif %}">
-                                                                    <h3>{{ ig }}</h3>
-                                                                    <p>Porcentagem: {{ data.percentage }}%</p>
-                                                                    <p>Meta: {{ data.meta }}%</p>
-                                                                </div>
+                                                            <div class="ig-box custom-ig-box 
+                                                                {% if ig == 'IG1' %}ig1 
+                                                                {% elif ig == 'IG2' %}ig2 
+                                                                {% elif ig == 'IG3' %}ig3 
+                                                                {% else %}default{% endif %}">
+                                                                <h3>{{ ig }}</h3>
+                                                                <p>Porcentagem: {{ data.percentage }}%</p>
+                                                                <p>Meta: {{ data.meta }}%</p>
+                                                            </div>
                                                             {% endfor %}
                                                         </div>
                                                     {% else %}

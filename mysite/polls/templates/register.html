@@ -79,7 +79,7 @@
                                         <div class="row mb-3">
                                             <div class="col-md-6">
                                                 <div class="form-floating mb-3 mb-md-0">
-                                                    <input name="primeiro_nome" class="form-control{% if form.primeiro_nome.errors %} is-invalid{% endif %}" id="inputFirstName" type="text" placeholder="Digite seu primeiro nome" value="{{ form.primeiro_nome.value|default_if_none:'' }}" />
+                                                    <input name="primeiro_nome" class="form-control{% if form.primeiro_nome.errors %} is-invalid{% endif %}" id="inputFirstName" type="text"  value="{{ form.primeiro_nome.value|default_if_none:'' }}" />
                                                     <label for="inputFirstName">Primeiro Nome</label>
                                                     {% if form.primeiro_nome.errors %}
                                                         <div class="invalid-feedback">
@@ -92,7 +92,7 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="form-floating mb-3 mb-md-0">
-                                                    <input name="sobrenome" class="form-control{% if form.sobrenome.errors %} is-invalid{% endif %}" id="inputLastName" type="text" placeholder="Digite seu sobrenome" value="{{ form.sobrenome.value|default_if_none:'' }}" />
+                                                    <input name="sobrenome" class="form-control{% if form.sobrenome.errors %} is-invalid{% endif %}" id="inputLastName" type="text"  value="{{ form.sobrenome.value|default_if_none:'' }}" />
                                                     <label for="inputLastName">Sobrenome</label>
                                                     {% if form.sobrenome.errors %}
                                                         <div class="invalid-feedback">
@@ -107,7 +107,7 @@
                                         <div class="row mb-3">
                                             <div class="form-floating">
                                                 <div class="form-floating mb-3 mb-md-0">
-                                                    <input name="cnpj" class="form-control{% if form.cnpj.errors %} is-invalid{% endif %}" id="inputCNPJ" type="text" placeholder="Digite o CNPJ da sua empresa" value="{{ form.cnpj.value|default_if_none:'' }}" />
+                                                    <input name="cnpj" class="form-control{% if form.cnpj.errors %} is-invalid{% endif %}" id="inputCNPJ" type="text" value="{{ form.cnpj.value|default_if_none:'' }}" />
                                                     <label for="inputCNPJ">CNPJ</label>
                                                     {% if form.cnpj.errors %}
                                                         <div class="invalid-feedback">
@@ -120,7 +120,7 @@
                                             </div>
                                         </div>
                                         <div class="form-floating mb-3">
-                                            <input name="email" class="form-control{% if form.email.errors %} is-invalid{% endif %}" id="inputEmail" type="email" placeholder="name@exemplo.com" value="{{ form.email.value|default_if_none:'' }}" />
+                                            <input name="email" class="form-control{% if form.email.errors %} is-invalid{% endif %}" id="inputEmail" type="email" value="{{ form.email.value|default_if_none:'' }}" />
                                             <label for="inputEmail">Endereço de email</label>
                                             {% if form.email.errors %}
                                                 <div class="invalid-feedback">
@@ -133,7 +133,7 @@
                                         <div class="row mb-3">
                                             <div class="col-md-6">
                                                 <div class="form-floating mb-3 mb-md-0">
-                                                    <input name="senha" class="form-control{% if form.senha.errors %} is-invalid{% endif %}" id="inputPassword" type="password" placeholder="Digite uma senha" value="{{ form.senha.value|default_if_none:'' }}" />
+                                                    <input name="senha" class="form-control{% if form.senha.errors %} is-invalid{% endif %}" id="inputPassword" type="password"  value="{{ form.senha.value|default_if_none:'' }}" />
                                                     <label for="inputPassword">Senha</label>
                                                     {% if form.senha.errors %}
                                                         <div class="invalid-feedback">
@@ -146,7 +146,7 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="form-floating mb-3 mb-md-0">
-                                                    <input name="confirmar_senha" class="form-control{% if form.confirmar_senha.errors %} is-invalid{% endif %}" id="inputPasswordConfirm" type="password" placeholder="Confirme sua senha" />
+                                                    <input name="confirmar_senha" class="form-control{% if form.confirmar_senha.errors %} is-invalid{% endif %}" id="inputPasswordConfirm" type="password"  />
                                                     <label for="inputPasswordConfirm">Confirme sua senha</label>
                                                     {% if form.confirmar_senha.errors %}
                                                         <div class="invalid-feedback">

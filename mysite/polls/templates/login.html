@@ -70,7 +70,7 @@
                                     <form method="post" action="{% url 'login' %}">
                                         {% csrf_token %}
                                         <div class="form-floating mb-3">
-                                            <input class="form-control" id="inputEmail" name="email" type="email" placeholder="name@example.com" required />
+                                            <input class="form-control" id="inputEmail" name="email" type="email"required />
                                             <label for="inputEmail">Endereço de email</label>
                                             {% if form.email.errors %}
                                                 <div class="alert alert-danger">
@@ -82,7 +82,7 @@
                                         </div>
                                     
                                         <div class="form-floating mb-3">
-                                            <input class="form-control" id="inputPassword" name="password" type="password" placeholder="Password" required />
+                                            <input class="form-control" id="inputPassword" name="password" type="password" required />
                                             <label for="inputPassword">Senha</label>
                                             {% if form.password.errors %}
                                                 <div class="alert alert-danger">
